@@ -1,0 +1,46 @@
+project_id = "dmbmlqfucquspiruvuam"
+
+[functions.translate-news]
+verify_jwt = false
+
+[functions.parse-rss]
+verify_jwt = false
+
+[functions.refresh-rss]
+verify_jwt = false
+
+[functions.us-treasury-curve]
+verify_jwt = false
+
+[functions.sync-macro-bcb]
+verify_jwt = false
+
+[functions.sync-macro-fred]
+verify_jwt = false
+
+[functions.fetch-copom]
+verify_jwt = false
+
+[functions.fetch-fedwatch]
+verify_jwt = false
+
+[functions.fedwatch-proxy]
+verify_jwt = false
+
+[functions.copom-proxy]
+verify_jwt = false
+
+[functions.sync-brapi-pe]
+verify_jwt = false
+
+[functions.sync-b3-flows]
+verify_jwt = false
+
+[functions.sync-sentiment-index]
+verify_jwt = false
+
+[functions.ibov-movers]
+verify_jwt = false
+
+[functions.anbima-ntnb]
+verify_jwt = false

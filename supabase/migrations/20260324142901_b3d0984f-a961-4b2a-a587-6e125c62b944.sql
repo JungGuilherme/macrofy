@@ -1,0 +1,1 @@
+ALTER TABLE public.morning_calls ADD COLUMN IF NOT EXISTS video_url TEXT;
