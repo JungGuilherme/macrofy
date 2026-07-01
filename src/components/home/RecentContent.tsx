@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom';
-import { reports, articles } from '@/data/mockData';
+import { useReports } from '@/hooks/useReports';
+import { useArticles } from '@/hooks/useArticles';
 import { ArrowRight, FileText, BookOpen } from 'lucide-react';
 
-const recentReports = reports.slice(0, 3);
-const recentArticles = articles.slice(0, 2);
-
 export function RecentContent() {
+  const { data: reports = [] } = useReports();
+  const { data: articles = [] } = useArticles();
+
+  const recentReports = reports.slice(0, 3);
+  const recentArticles = articles.slice(0, 2);
+
   return (
     <div className="bg-card rounded-xl border p-5">
       <div className="section-header">
@@ -36,11 +40,14 @@ export function RecentContent() {
                     {report.title}
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(report.publishedAt).toLocaleDateString('pt-BR')}
+                    {new Date(report.created_at).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
               </Link>
             ))}
+            {recentReports.length === 0 && (
+              <p className="text-xs text-muted-foreground px-3">Nenhum relatório publicado ainda.</p>
+            )}
           </div>
           <Link
             to="/relatorios"
@@ -70,11 +77,14 @@ export function RecentContent() {
                     {article.title}
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    {article.readTime} min de leitura
+                    {article.read_time ? `${article.read_time} min de leitura` : new Date(article.created_at).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
               </Link>
             ))}
+            {recentArticles.length === 0 && (
+              <p className="text-xs text-muted-foreground px-3">Nenhum artigo publicado ainda.</p>
+            )}
           </div>
           <Link
             to="/artigos"

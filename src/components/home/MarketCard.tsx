@@ -1,6 +1,15 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MarketQuote } from '@/data/mockData';
+
+export interface MarketQuote {
+  id: string;
+  name: string;
+  ticker: string;
+  value: number;
+  change: number;
+  changePercent: number;
+  category: 'bolsa' | 'juros' | 'cambio' | 'commodities' | 'cripto';
+}
 
 interface MarketCardProps {
   quote: MarketQuote;
