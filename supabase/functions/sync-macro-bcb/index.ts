@@ -59,6 +59,8 @@ function formatValue(value: number, unit: string): string {
   if (unit === "%") return `${value.toFixed(2)}%`;
   if (unit === "index" || unit === "pts") return value.toFixed(1);
   if (unit === "R$") return value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  if (unit === "USD/BRL") return value.toFixed(4);
+  if (unit === "empregos") return value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
   if (Math.abs(value) >= 1000) return value.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   return value.toFixed(2);
 }

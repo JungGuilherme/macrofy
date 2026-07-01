@@ -1,0 +1,52 @@
+name: Sync Macro Data
+
+on:
+  schedule:
+    # 07:45 UTC every day — runs after pg_cron jobs (07:00–07:30)
+    # Acts as a daily guarantee if pg_cron/pg_net fails
+    - cron: '45 7 * * *'
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Which functions to run (comma-separated, or "all")'
+        required: false
+        default: all
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+    steps:
+      - name: Determine functions to run
+        id: pick
+        run: |
+          INPUT="${{ github.event.inputs.functions }}"
+          if [[ -z "$INPUT" || "$INPUT" == "all" ]]; then
+            echo "functions=sync-macro-bcb,sync-macro-fred,sync-macro-global" >> $GITHUB_OUTPUT
+          else
+            echo "functions=$INPUT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Call sync Edge Functions
+        run: |
+          IFS=',' read -ra FNS <<< "${{ steps.pick.outputs.functions }}"
+          for fn in "${FNS[@]}"; do
+            fn=$(echo "$fn" | tr -d ' ')
+            echo "▶ Calling $fn …"
+            HTTP_STATUS=$(curl -s -o /tmp/resp_${fn}.json -w "%{http_code}" \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -H "x-sync-secret: ${SYNC_SECRET}" \
+              -d '{}' \
+              "${SUPABASE_URL}/functions/v1/${fn}")
+            echo "   Status: $HTTP_STATUS"
+            cat /tmp/resp_${fn}.json | head -c 500
+            echo ""
+            if [[ "$HTTP_STATUS" != "200" ]]; then
+              echo "::warning::$fn returned HTTP $HTTP_STATUS"
+            fi
+            # Brief pause so functions don't all hammer BCB API simultaneously
+            sleep 30
+          done
