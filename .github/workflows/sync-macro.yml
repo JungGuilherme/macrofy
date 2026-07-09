@@ -20,6 +20,9 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Login as admin
         id: login
         run: |
@@ -62,7 +65,10 @@ jobs:
         run: |
           INPUT="${{ github.event.inputs.functions }}"
           if [[ -z "$INPUT" || "$INPUT" == "all" ]]; then
-            echo "functions=sync-macro-bcb,sync-macro-fred,sync-macro-global" >> $GITHUB_OUTPUT
+            # sync-macro-global is NOT called as an edge function: it times out
+            # (504) fetching ~85 World Bank series. Its work is done by the
+            # "Sync global snapshot" step below instead.
+            echo "functions=sync-macro-bcb,sync-macro-fred" >> $GITHUB_OUTPUT
           else
             echo "functions=$INPUT" >> $GITHUB_OUTPUT
           fi
@@ -92,3 +98,6 @@ jobs:
             sleep 30
           done
           exit $FAILED
+
+      - name: Sync global snapshot (World Bank + BR/US aggregates)
+        run: node scripts/sync-global-snapshot.mjs

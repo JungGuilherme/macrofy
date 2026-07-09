@@ -4,10 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { RefreshCw, Database, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// sync-macro-global is intentionally absent: it exceeds the edge function
+// gateway timeout (504). The global country table is refreshed by the daily
+// GitHub Actions workflow (scripts/sync-global-snapshot.mjs) instead.
 const SYNC_FUNCTIONS = [
   { name: 'sync-macro-bcb', label: 'Banco Central (IPCA, Selic, IBC-Br, CAGED…)' },
   { name: 'sync-macro-fred', label: 'FRED — dados dos EUA (CPI, PCE, payroll…)' },
-  { name: 'sync-macro-global', label: 'Snapshot global (tabela de países)' },
 ] as const;
 
 // New BR series seeded on demand; ignored if already present
@@ -88,8 +90,8 @@ export function MacroSyncSection() {
         <h2 className="text-lg font-semibold text-foreground">Dados Macro</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        Atualiza os indicadores do Banco Central, FRED e World Bank. A sincronização
-        automática roda todo dia às 7h (Brasília) via GitHub Actions.
+        Atualiza os indicadores do Banco Central e do FRED. A sincronização automática
+        (incluindo a tabela global de países) roda todo dia às 7h (Brasília) via GitHub Actions.
       </p>
 
       <Button onClick={runSync} disabled={running}>
