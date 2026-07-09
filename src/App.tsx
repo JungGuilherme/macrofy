@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,30 +10,40 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 
-// Pages
+// Eagerly loaded: login gate and home (first paint)
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Recommendations from "./pages/Recommendations";
-import RecommendationDetail from "./pages/RecommendationDetail";
-import Reports from "./pages/Reports";
-import ReportDetail from "./pages/ReportDetail";
-import Articles from "./pages/Articles";
-import ArticleDetail from "./pages/ArticleDetail";
-import Projections from "./pages/Projections";
-import Videos from "./pages/Videos";
-import Favorites from "./pages/Favorites";
-import Recents from "./pages/Recents";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import MorningCall from "./pages/MorningCall";
-import Markets from "./pages/Markets";
-import News from "./pages/News";
-import NewsDetail from "./pages/NewsDetail";
-import TesouroCurvas from "./pages/TesouroCurvas";
-import MacroDashboard from "./pages/MacroDashboard";
-import Brasil from "./pages/Brasil";
-import EUA from "./pages/EUA";
-import Eleicoes2026 from "./pages/Eleicoes2026";
+
+// Lazily loaded: everything else downloads on first visit to the route
+const Recommendations = lazy(() => import("./pages/Recommendations"));
+const RecommendationDetail = lazy(() => import("./pages/RecommendationDetail"));
+const Reports = lazy(() => import("./pages/Reports"));
+const ReportDetail = lazy(() => import("./pages/ReportDetail"));
+const Articles = lazy(() => import("./pages/Articles"));
+const ArticleDetail = lazy(() => import("./pages/ArticleDetail"));
+const Projections = lazy(() => import("./pages/Projections"));
+const Videos = lazy(() => import("./pages/Videos"));
+const Favorites = lazy(() => import("./pages/Favorites"));
+const Recents = lazy(() => import("./pages/Recents"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const MorningCall = lazy(() => import("./pages/MorningCall"));
+const Markets = lazy(() => import("./pages/Markets"));
+const News = lazy(() => import("./pages/News"));
+const NewsDetail = lazy(() => import("./pages/NewsDetail"));
+const TesouroCurvas = lazy(() => import("./pages/TesouroCurvas"));
+const MacroDashboard = lazy(() => import("./pages/MacroDashboard"));
+const Brasil = lazy(() => import("./pages/Brasil"));
+const EUA = lazy(() => import("./pages/EUA"));
+const Eleicoes2026 = lazy(() => import("./pages/Eleicoes2026"));
+
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <span className="text-sm text-muted-foreground animate-pulse">Carregando…</span>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -70,6 +81,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AppLayout>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/morning-call" element={<MorningCall />} />
@@ -102,6 +114,7 @@ function AppRoutes() {
                 <Route path="/configuracoes" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </AppLayout>
           </ProtectedRoute>
         }
