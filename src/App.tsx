@@ -12,7 +12,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 // Pages
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Dashboards from "./pages/Dashboards";
 import Recommendations from "./pages/Recommendations";
 import RecommendationDetail from "./pages/RecommendationDetail";
 import Reports from "./pages/Reports";
@@ -83,11 +82,13 @@ function AppRoutes() {
                 <Route path="/eua/:tab" element={<EUA />} />
                 <Route path="/tesouro-curvas" element={<TesouroCurvas />} />
                 <Route path="/macro" element={<MacroDashboard />} />
-                <Route path="/macro/:country" element={<MacroDashboard />} />
+                {/* Old country-level macro URLs → country pages, Macro tab */}
+                <Route path="/macro/brasil" element={<Navigate to="/brasil/macro" replace />} />
+                <Route path="/macro/eua" element={<Navigate to="/eua/macro" replace />} />
                 <Route path="/noticias" element={<News />} />
                 <Route path="/noticias/:id" element={<NewsDetail />} />
-                <Route path="/dashboards" element={<Dashboards />} />
-                <Route path="/dashboards/:section" element={<Dashboards />} />
+                <Route path="/dashboards" element={<Navigate to="/macro" replace />} />
+                <Route path="/dashboards/:section" element={<Navigate to="/macro" replace />} />
                 <Route path="/recomendacoes" element={<Recommendations />} />
                 <Route path="/recomendacoes/:id" element={<RecommendationDetail />} />
                 <Route path="/relatorios" element={<Reports />} />

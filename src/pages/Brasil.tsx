@@ -10,12 +10,7 @@ import { TradingViewEmbed } from "@/components/widgets/TradingViewEmbed";
 import BrazilValuationSection from "@/components/markets/BrazilValuationSection";
 import B3FlowsSection from "@/components/macro/B3FlowsSection";
 
-import MacroSummaryCards from "@/components/macro/MacroSummaryCards";
-import MacroCountryCharts from "@/components/macro/MacroCountryCharts";
-import MacroHeatmapTable from "@/components/macro/MacroHeatmapTable";
-import CopomCard from "@/components/macro/CopomCard";
-import BrazilHistoricalPEChart from "@/components/macro/BrazilHistoricalPEChart";
-import { useMacroMetadata, useMacroData } from "@/hooks/useMacroData";
+import CountryMacroPanel from "@/components/macro/CountryMacroPanel";
 
 import BrazilCurvePanel from "@/components/curves/BrazilCurvePanel";
 import SentimentIndexSection from "@/components/sentiment/SentimentIndexSection";
@@ -81,9 +76,6 @@ export default function Brasil() {
     navigate(`/brasil/${value}`);
   };
 
-  const { data: metadata } = useMacroMetadata();
-  const { data: heatmapData, isLoading: heatLoading } = useMacroData("BR", 12);
-
   return (
     <div className="space-y-6 animate-fade-up">
       <div className="flex items-center gap-3">
@@ -123,23 +115,7 @@ export default function Brasil() {
 
         {/* MACRO */}
         <TabsContent value="macro" className="space-y-4 mt-4">
-          <MacroSummaryCards country="BR" data={heatmapData || []} />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CopomCard />
-          </div>
-
-          <MacroCountryCharts country="BR" />
-
-          <BrazilHistoricalPEChart />
-
-          <MacroHeatmapTable
-            data={heatmapData || []}
-            metadata={metadata?.filter((m) => m.country === "BR") || []}
-            isLoading={heatLoading}
-            onRowClick={() => {}}
-            period={12}
-          />
+          <CountryMacroPanel country="BR" />
         </TabsContent>
 
         {/* RENDA FIXA */}

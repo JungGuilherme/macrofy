@@ -39,7 +39,7 @@ const roleColors: Record<AppRole, string> = {
 const shortcuts = [
   { key: '/', description: 'Abrir busca global' },
   { key: 'G H', description: 'Ir para Home' },
-  { key: 'G D', description: 'Ir para Dashboards' },
+  { key: 'G D', description: 'Ir para Visão Global' },
   { key: 'G R', description: 'Ir para Recomendações' },
   { key: 'G L', description: 'Ir para Relatórios' },
   { key: 'F', description: 'Favoritar item (em detalhes)' },
@@ -91,7 +91,7 @@ export function AppHeader() {
         gPressed = false;
         switch (e.key.toLowerCase()) {
           case 'h': navigate('/'); break;
-          case 'd': navigate('/dashboards'); break;
+          case 'd': navigate('/macro'); break;
           case 'r': navigate('/recomendacoes'); break;
           case 'l': navigate('/relatorios'); break;
         }

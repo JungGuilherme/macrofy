@@ -255,7 +255,7 @@ export default function Settings() {
               <kbd className="px-2 py-0.5 bg-muted rounded font-mono">G H</kbd>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Ir para Dashboards</span>
+              <span className="text-muted-foreground">Ir para Visão Global</span>
               <kbd className="px-2 py-0.5 bg-muted rounded font-mono">G D</kbd>
             </div>
             <div className="flex justify-between py-2 border-b border-border">

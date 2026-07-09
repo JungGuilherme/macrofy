@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
 import {
@@ -12,9 +12,6 @@ import {
   ChevronRight,
   TrendingUp,
   BookOpen,
-  Target,
-  Video,
-  ChevronDown,
   Coffee,
   BarChart2,
   LineChart,
@@ -22,13 +19,7 @@ import {
   Flag,
   Vote,
 } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NavItemProps {
@@ -83,76 +74,14 @@ function NavItem({ to, icon, label, collapsed, badge, end }: NavItemProps) {
   return content;
 }
 
-interface NavGroupProps {
-  label: string;
-  icon: React.ReactNode;
-  collapsed: boolean;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  pathPrefix?: string;
-}
-
-function NavGroup({ label, icon, collapsed, children, defaultOpen = false, pathPrefix }: NavGroupProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  const location = useLocation();
-  
-  const checkPath = pathPrefix || `/${label.toLowerCase().replace(/\s/g, '-')}`;
-  const isChildActive = location.pathname.startsWith(checkPath);
-
+function SectionLabel({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
   if (collapsed) {
-    return (
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>
-          <button
-            className={cn(
-              'flex items-center justify-center w-full px-2 py-2.5 rounded-lg transition-all duration-200',
-              'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground',
-              isChildActive && 'bg-sidebar-accent text-sidebar-foreground'
-            )}
-          >
-            {icon}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="font-medium">
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    );
+    return <div className="mx-2 my-3 border-t border-sidebar-border" />;
   }
-
   return (
-    <Collapsible open={open || isChildActive} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground">
-        <span className="flex-shrink-0">{icon}</span>
-        <span className="flex-1 text-left text-sm">{label}</span>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 transition-transform duration-200',
-            open && 'rotate-180'
-          )}
-        />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pl-9 space-y-0.5 mt-0.5">
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function SubNavItem({ to, label }: { to: string; label: string }) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        cn(
-          'block px-3 py-2 text-sm rounded-lg transition-all duration-200',
-          'hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground',
-          isActive && 'bg-sidebar-accent/50 text-sidebar-foreground font-medium'
-        )
-      }
-    >
-      {label}
-    </NavLink>
+    <p className="px-3 pt-4 pb-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+      {children}
+    </p>
   );
 }
 
@@ -194,59 +123,33 @@ export function AppSidebar() {
         <NavItem to="/" icon={<Home className="h-5 w-5" />} label="Home" collapsed={collapsed} end />
         <NavItem to="/morning-call" icon={<Coffee className="h-5 w-5" />} label="Morning Call" collapsed={collapsed} />
         <NavItem to="/noticias" icon={<Newspaper className="h-5 w-5" />} label="Notícias" collapsed={collapsed} />
+
+        <SectionLabel collapsed={collapsed}>Mercados & Macro</SectionLabel>
         <NavItem to="/mercados" icon={<BarChart2 className="h-5 w-5" />} label="Mercados" collapsed={collapsed} />
-        <NavItem to="/eleicoes-2026" icon={<Vote className="h-5 w-5" />} label="Eleições 2026" collapsed={collapsed} />
         <NavItem to="/brasil" icon={<Flag className="h-5 w-5" />} label="🇧🇷 Brasil" collapsed={collapsed} />
         <NavItem to="/eua" icon={<Flag className="h-5 w-5" />} label="🇺🇸 Estados Unidos" collapsed={collapsed} />
+        <NavItem to="/macro" icon={<LayoutDashboard className="h-5 w-5" />} label="Visão Global" collapsed={collapsed} />
         <NavItem to="/tesouro-curvas" icon={<LineChart className="h-5 w-5" />} label="Curvas de Juros" collapsed={collapsed} />
+        <NavItem to="/eleicoes-2026" icon={<Vote className="h-5 w-5" />} label="Eleições 2026" collapsed={collapsed} />
 
-        <NavGroup
-          label="Dashboard Macro"
-          icon={<LayoutDashboard className="h-5 w-5" />}
-          collapsed={collapsed}
-          defaultOpen
-          pathPrefix="/macro"
-        >
-          <SubNavItem to="/macro" label="Visão Global" />
-          <SubNavItem to="/macro/brasil" label="Brasil" />
-          <SubNavItem to="/macro/eua" label="Estados Unidos" />
-        </NavGroup>
-
+        <SectionLabel collapsed={collapsed}>Research</SectionLabel>
         <NavItem
           to="/recomendacoes"
           icon={<TrendingUp className="h-5 w-5" />}
           label="Recomendações"
           collapsed={collapsed}
         />
-
         <NavItem
           to="/relatorios"
           icon={<FileText className="h-5 w-5" />}
           label="Relatórios & Cartas"
           collapsed={collapsed}
         />
-
         <NavItem
           to="/artigos"
           icon={<BookOpen className="h-5 w-5" />}
           label="Artigos"
           collapsed={collapsed}
-        />
-
-        <NavItem
-          to="/projecoes"
-          icon={<Target className="h-5 w-5" />}
-          label="Projeções"
-          collapsed={collapsed}
-          badge="Em breve"
-        />
-
-        <NavItem
-          to="/videos"
-          icon={<Video className="h-5 w-5" />}
-          label="Vídeos & Cursos"
-          collapsed={collapsed}
-          badge="Em breve"
         />
 
         <div className="pt-4 mt-4 border-t border-sidebar-border">

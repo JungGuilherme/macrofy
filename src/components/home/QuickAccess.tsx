@@ -3,19 +3,25 @@ import {
   LayoutDashboard,
   TrendingUp,
   FileText,
-  Target,
-  Video,
+  Flag,
   ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const quickLinks = [
   {
-    to: '/macro',
-    icon: LayoutDashboard,
-    label: 'Dashboards',
-    description: 'Visão geral do mercado',
+    to: '/brasil',
+    icon: Flag,
+    label: 'Brasil',
+    description: 'Mercado e macro BR',
     color: 'from-primary to-blue-light',
+  },
+  {
+    to: '/eua',
+    icon: Flag,
+    label: 'EUA',
+    description: 'Mercado e macro EUA',
+    color: 'from-navy to-navy-light',
   },
   {
     to: '/mercados',
@@ -25,27 +31,18 @@ const quickLinks = [
     color: 'from-gold to-gold-light',
   },
   {
+    to: '/macro',
+    icon: LayoutDashboard,
+    label: 'Visão Global',
+    description: 'Comparativo de países',
+    color: 'from-primary to-blue-light',
+  },
+  {
     to: '/relatorios',
     icon: FileText,
     label: 'Relatórios',
     description: 'Cartas e análises',
     color: 'from-navy to-navy-light',
-  },
-  {
-    to: '/projecoes',
-    icon: Target,
-    label: 'Projeções',
-    description: 'Em breve',
-    disabled: true,
-    color: 'from-muted-foreground/50 to-muted-foreground/30',
-  },
-  {
-    to: '/videos',
-    icon: Video,
-    label: 'Vídeos',
-    description: 'Em breve',
-    disabled: true,
-    color: 'from-muted-foreground/50 to-muted-foreground/30',
   },
 ];
 
