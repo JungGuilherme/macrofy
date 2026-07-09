@@ -2,9 +2,8 @@ name: Sync Macro Data
 
 on:
   schedule:
-    # 07:45 UTC every day — runs after pg_cron jobs (07:00–07:30)
-    # Acts as a daily guarantee if pg_cron/pg_net fails
-    - cron: '45 7 * * *'
+    # 10:00 UTC = 07:00 Brasília — daily refresh of macro data
+    - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
       functions:
@@ -17,8 +16,47 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
     steps:
+      - name: Login as admin
+        id: login
+        run: |
+          RESP=$(curl -s -X POST \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
+            "${SUPABASE_URL}/auth/v1/token?grant_type=password")
+          TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
+          if [[ -z "$TOKEN" ]]; then
+            echo "::error::Admin login failed"
+            echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error_description') or d.get('msg') or 'unknown error')"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✓ Logged in"
+
+      - name: Seed series metadata (CAGED, câmbio)
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/seed.json -w "%{http_code}" \
+            -X POST \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${{ steps.login.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=ignore-duplicates" \
+            -d '[
+              {"country":"BR","category":"Trabalho","indicator":"CAGED (saldo)","source":"BCB","series_code":"28763","unit":"empregos","frequency":"monthly","default_mode":"level","polarity":"positive","sort_order":32,"enabled":true,"notes":"Saldo de empregos celetistas — CAGED"},
+              {"country":"BR","category":"Fiscal/Externo","indicator":"Câmbio USD/BRL","source":"BCB","series_code":"1","unit":"USD/BRL","frequency":"monthly","default_mode":"level","polarity":"negative","sort_order":41,"enabled":true,"notes":"Taxa de câmbio livre — Dólar (venda) — fim de período"}
+            ]' \
+            "${SUPABASE_URL}/rest/v1/macro_series_metadata?on_conflict=country,series_code")
+          echo "Seed status: $HTTP_STATUS"
+          if [[ "$HTTP_STATUS" != "201" && "$HTTP_STATUS" != "200" ]]; then
+            cat /tmp/seed.json
+            echo "::warning::Seed returned HTTP $HTTP_STATUS (rows may already exist)"
+          fi
+
       - name: Determine functions to run
         id: pick
         run: |
@@ -31,22 +69,26 @@ jobs:
 
       - name: Call sync Edge Functions
         run: |
+          FAILED=0
           IFS=',' read -ra FNS <<< "${{ steps.pick.outputs.functions }}"
           for fn in "${FNS[@]}"; do
             fn=$(echo "$fn" | tr -d ' ')
             echo "▶ Calling $fn …"
             HTTP_STATUS=$(curl -s -o /tmp/resp_${fn}.json -w "%{http_code}" \
               -X POST \
+              -H "apikey: ${SUPABASE_ANON_KEY}" \
+              -H "Authorization: Bearer ${{ steps.login.outputs.token }}" \
               -H "Content-Type: application/json" \
-              -H "x-sync-secret: ${SYNC_SECRET}" \
               -d '{}' \
               "${SUPABASE_URL}/functions/v1/${fn}")
             echo "   Status: $HTTP_STATUS"
-            cat /tmp/resp_${fn}.json | head -c 500
+            head -c 500 /tmp/resp_${fn}.json
             echo ""
             if [[ "$HTTP_STATUS" != "200" ]]; then
-              echo "::warning::$fn returned HTTP $HTTP_STATUS"
+              echo "::error::$fn returned HTTP $HTTP_STATUS"
+              FAILED=1
             fi
-            # Brief pause so functions don't all hammer BCB API simultaneously
+            # Brief pause so functions don't hammer the BCB API simultaneously
             sleep 30
           done
+          exit $FAILED

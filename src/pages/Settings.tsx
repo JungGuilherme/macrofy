@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { MacroSyncSection } from '@/components/settings/MacroSyncSection';
 
 interface FeedbackItem {
   id: string;
@@ -144,6 +145,9 @@ export default function Settings() {
       />
 
       <div className="max-w-2xl space-y-4 sm:space-y-6">
+        {/* Admin: Macro data sync */}
+        {isAdmin && <MacroSyncSection />}
+
         {/* Admin: Feedback/Suggestions */}
         {isAdmin && <FeedbackSection />}
 
