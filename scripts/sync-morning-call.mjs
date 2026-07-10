@@ -42,9 +42,51 @@ function parseEntries(xml) {
     const videoId = block.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1];
     const title = block.match(/<title>([^<]+)<\/title>/)?.[1]?.trim();
     const published = block.match(/<published>([^<]+)<\/published>/)?.[1];
-    if (videoId && title && published) entries.push({ videoId, title, published });
+    const thumbnail = block.match(/<media:thumbnail url="([^"]+)"/)?.[1];
+    if (videoId && title && published) entries.push({ videoId, title, published, thumbnail });
   }
   return entries;
+}
+
+// Hidden feed row that stores the channel's recent videos for the Morning
+// Call page. is_active=false keeps it out of the News portal.
+const YT_FEED_NAME = 'YouTube · Alta Vista';
+
+async function upsertChannelFeed(token, entries) {
+  const items = entries.map((e) => ({
+    guid: e.videoId,
+    title: e.title,
+    description: '',
+    link: `https://www.youtube.com/watch?v=${e.videoId}`,
+    pubDate: e.published,
+    creators: [],
+    imageUrl: e.thumbnail || `https://i3.ytimg.com/vi/${e.videoId}/hqdefault.jpg`,
+  }));
+
+  const q = `${SUPABASE_URL}/rest/v1/rss_feeds?name=eq.${encodeURIComponent(YT_FEED_NAME)}&select=id`;
+  const existing = await (await fetch(q, { headers: headers(token) })).json();
+
+  if (Array.isArray(existing) && existing.length > 0) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?id=eq.${existing[0].id}`, {
+      method: 'PATCH',
+      headers: { ...headers(token), Prefer: 'return=minimal' },
+      body: JSON.stringify({ items }),
+    });
+    console.log(res.ok ? `Channel feed updated (${items.length} videos).` : `Feed update failed: HTTP ${res.status}`);
+  } else {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds`, {
+      method: 'POST',
+      headers: { ...headers(token), Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        name: YT_FEED_NAME,
+        items,
+        display_order: 999,
+        is_active: false,
+        feed_url: FEED_URL,
+      }),
+    });
+    console.log(res.ok ? `Channel feed created (${items.length} videos).` : `Feed create failed: HTTP ${res.status} ${await res.text()}`);
+  }
 }
 
 /** Date (YYYY-MM-DD) in America/Sao_Paulo for a given ISO timestamp. */
@@ -63,18 +105,21 @@ if (!feedRes.ok) {
 const xml = await feedRes.text();
 const entries = parseEntries(xml);
 
+const token = await login();
+
+// Store the channel's recent videos for the "outros vídeos" grid.
+await upsertChannelFeed(token, entries);
+
 // The channel posts other content too — only take actual Morning Calls.
 const mc = entries.find((e) => /morning\s*call/i.test(e.title));
 if (!mc) {
-  console.log('No Morning Call entry found in the feed — nothing to do.');
+  console.log('No Morning Call entry found in the feed — nothing else to do.');
   process.exit(0);
 }
 
 const videoUrl = `https://www.youtube.com/watch?v=${mc.videoId}`;
 const publishedDate = spDate(mc.published);
 console.log(`Latest: "${mc.title}" → ${videoUrl} (${publishedDate})`);
-
-const token = await login();
 
 // Upsert by published_date (no unique constraint on the column)
 const q = `${SUPABASE_URL}/rest/v1/morning_calls?published_date=eq.${publishedDate}&select=id,video_url`;

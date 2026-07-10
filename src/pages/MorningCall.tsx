@@ -9,8 +9,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Coffee, Save, Edit, X, Youtube } from "lucide-react";
 import { GlobalFuturesWatchlist } from "@/components/markets/GlobalFuturesWatchlist";
 import { useMorningCall } from "@/hooks/useMorningCall";
+import { useRssFeeds, type RssFeedItem } from "@/hooks/useRssFeeds";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
+// Hidden feed row maintained by scripts/sync-morning-call.mjs
+const YT_FEED_NAME = "YouTube · Alta Vista";
+
+function videoTimeAgo(pubDate: string): string {
+  const d = new Date(pubDate);
+  if (isNaN(d.getTime())) return "";
+  const hours = Math.floor((Date.now() - d.getTime()) / 3_600_000);
+  if (hours < 1) return "agora";
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "ontem";
+  if (days < 30) return `há ${days} dias`;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
 
 function extractYoutubeEmbedUrl(url: string): string | null {
   if (!url) return null;
@@ -34,8 +51,10 @@ export default function MorningCall() {
   const { role } = useAuth();
   const isAdmin = role === "admin";
   const { todaysMorningCall, isLoading, saveMorningCall } = useMorningCall();
+  const { data: feeds = [] } = useRssFeeds();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<RssFeedItem | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [isPublished, setIsPublished] = useState(true);
   const [publishedDate, setPublishedDate] = useState(() => {
@@ -65,10 +84,22 @@ export default function MorningCall() {
     );
   };
 
-  const embedUrl = useMemo(
-    () => extractYoutubeEmbedUrl(isEditing ? videoUrl : todaysMorningCall?.video_url || ""),
-    [isEditing, videoUrl, todaysMorningCall?.video_url]
+  const channelVideos = useMemo(
+    () => feeds.find((f) => f.name === YT_FEED_NAME)?.items ?? [],
+    [feeds]
   );
+
+  const playingUrl = isEditing
+    ? videoUrl
+    : selectedVideo?.link || todaysMorningCall?.video_url || "";
+
+  const embedUrl = useMemo(() => extractYoutubeEmbedUrl(playingUrl), [playingUrl]);
+
+  // Videos for the grid — everything except what's currently playing
+  const gridVideos = useMemo(() => {
+    const playingId = extractYoutubeEmbedUrl(playingUrl)?.split("/embed/")[1];
+    return channelVideos.filter((v) => v.guid !== playingId).slice(0, 12);
+  }, [channelVideos, playingUrl]);
 
   const dateLabel = useMemo(() => {
     if (!todaysMorningCall?.published_date) return null;
@@ -162,7 +193,7 @@ export default function MorningCall() {
 
       {/* Video */}
       {showVideo ? (
-        <div className="max-w-4xl mx-auto w-full">
+        <div className="max-w-4xl mx-auto w-full space-y-2">
           <div className="aspect-video rounded-xl overflow-hidden border border-border shadow-lg">
             <iframe
               src={embedUrl}
@@ -172,6 +203,15 @@ export default function MorningCall() {
               allowFullScreen
             />
           </div>
+          {selectedVideo && (
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm font-medium text-foreground truncate">{selectedVideo.title}</p>
+              <Button variant="outline" size="sm" onClick={() => setSelectedVideo(null)}>
+                <Coffee className="h-3.5 w-3.5 mr-2" />
+                Voltar ao Morning Call de hoje
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <Card>
@@ -183,6 +223,46 @@ export default function MorningCall() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Other channel videos */}
+      {gridVideos.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Youtube className="h-4 w-4 text-destructive" />
+            <h2 className="text-sm font-semibold text-foreground">Outros vídeos do canal</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {gridVideos.map((v) => (
+              <button
+                key={v.guid}
+                onClick={() => {
+                  setSelectedVideo(v);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={cn(
+                  "group text-left rounded-xl border bg-card overflow-hidden transition-colors",
+                  "hover:border-primary/40"
+                )}
+              >
+                <div className="aspect-video bg-muted overflow-hidden">
+                  <img
+                    src={v.imageUrl || `https://i3.ytimg.com/vi/${v.guid}/hqdefault.jpg`}
+                    alt=""
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
+                  />
+                </div>
+                <div className="p-2.5">
+                  <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                    {v.title}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{videoTimeAgo(v.pubDate)}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Futures watchlist */}
