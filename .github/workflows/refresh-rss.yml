@@ -1,0 +1,50 @@
+name: Refresh RSS Feeds
+
+on:
+  schedule:
+    # Every 30 minutes — keeps the news portal fresh through the day.
+    # (GitHub may delay scheduled runs by a few minutes under load.)
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Login as admin
+        id: login
+        run: |
+          RESP=$(curl -s -X POST \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
+            "${SUPABASE_URL}/auth/v1/token?grant_type=password")
+          TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
+          if [[ -z "$TOKEN" ]]; then
+            echo "::error::Admin login failed"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Call refresh-rss
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${{ steps.login.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${SUPABASE_URL}/functions/v1/refresh-rss")
+          echo "Status: $HTTP_STATUS"
+          head -c 800 /tmp/resp.json
+          echo ""
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "::error::refresh-rss returned HTTP $HTTP_STATUS"
+            exit 1
+          fi

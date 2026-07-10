@@ -74,7 +74,6 @@ export function getThemeItems(feeds: RssFeed[], theme: string): RssFeedItem[] {
   return allItems;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export function useRssFeeds() {
   return useQuery({
@@ -102,8 +101,10 @@ export function useRssFeeds() {
         is_active: d.is_active ?? true,
       })) as RssFeed[];
     },
-    refetchInterval: ONE_HOUR_MS,
-    staleTime: ONE_HOUR_MS / 2,
+    // The refresh-rss workflow repopulates the table every ~30 min;
+    // re-read often enough that the portal follows along.
+    refetchInterval: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
