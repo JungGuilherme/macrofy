@@ -128,15 +128,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole('aai');
   };
 
+  // Local-dev only: VITE_DEV_FAKE_AUTH=true in .env fakes an admin session so
+  // layout work doesn't require credentials. Dead code in production builds
+  // (import.meta.env.DEV is false); data stays behind RLS regardless.
+  const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_FAKE_AUTH === 'true';
+
   return (
     <AuthContext.Provider
       value={{
         user,
         session,
         profile,
-        role,
-        isLoading,
-        isAuthenticated: !!user,
+        role: devBypass ? 'admin' : role,
+        isLoading: devBypass ? false : isLoading,
+        isAuthenticated: devBypass || !!user,
         signIn,
         signUp,
         signOut,
