@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -11,6 +11,61 @@ import { cn } from '@/lib/utils';
  */
 
 const MONO = { fontFamily: "'Roboto Mono', ui-monospace, monospace" };
+
+/* ── Live scrolling ticker (TradingView embed — public, no auth needed) ── */
+function LandingTicker() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tradingview-widget-container';
+    wrapper.style.width = '100%';
+
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container__widget';
+    wrapper.appendChild(widgetDiv);
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      symbols: [
+        { proName: 'INDEX:IBOV', title: 'IBOVESPA' },
+        { proName: 'FX_IDC:USDBRL', title: 'USD/BRL' },
+        { proName: 'FOREXCOM:SPXUSD', title: 'S&P 500' },
+        { proName: 'FOREXCOM:NSXUSD', title: 'Nasdaq 100' },
+        { proName: 'BMFBOVESPA:IFIX', title: 'IFIX' },
+        { proName: 'AMEX:EWZ', title: 'EWZ' },
+        { proName: 'BLACKBULL:BRENT', title: 'Brent' },
+        { proName: 'BITSTAMP:BTCUSD', title: 'Bitcoin' },
+        { proName: 'FX_IDC:EURUSD', title: 'EUR/USD' },
+      ],
+      showSymbolLogo: true,
+      isTransparent: true,
+      displayMode: 'adaptive',
+      colorTheme: 'dark',
+      locale: 'br',
+    });
+
+    wrapper.appendChild(script);
+    container.appendChild(wrapper);
+
+    return () => {
+      container.innerHTML = '';
+    };
+  }, []);
+
+  return (
+    <div className="border-y border-zinc-900 bg-zinc-950">
+      <div ref={containerRef} className="w-full overflow-hidden" style={{ minHeight: '46px' }} />
+    </div>
+  );
+}
 
 /* ── Illustrative heatmap mock (labeled as such) ── */
 interface MockRow {
@@ -193,6 +248,9 @@ export default function Landing() {
           Entrar
         </Link>
       </header>
+
+      {/* Live market ticker */}
+      <LandingTicker />
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-5 md:px-6 pt-10 md:pt-16 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
