@@ -10,7 +10,7 @@ import {
 } from '@/hooks/useCuratedNews';
 import { NEWS_THEMES, type NewsTheme } from '@/lib/newsThemes';
 import { useThemeLabels, resolveLabel, getOrderedThemes } from '@/hooks/useThemeLabels';
-import { NewsTerminalList } from '@/components/news/NewsTerminalList';
+import { NewsPortal } from '@/components/news/NewsPortal';
 import { ManualNewsDrawer } from '@/components/news/ManualNewsDrawer';
 import { ThemeManagementDrawer } from '@/components/news/ThemeManagementDrawer';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
@@ -162,9 +162,10 @@ export default function News() {
         </button>
       </div>
 
-      {/* Terminal list */}
-      <NewsTerminalList
+      {/* Portal layout */}
+      <NewsPortal
         rows={rows}
+        feeds={feeds}
         isAdmin={isAdmin}
         onToggleFeatured={toggleFeatured}
         onEditManual={openEdit}
