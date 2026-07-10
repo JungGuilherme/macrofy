@@ -1,0 +1,24 @@
+name: Sync Morning Call
+
+on:
+  schedule:
+    # The channel publishes around 08:00 Brasília (11:00 UTC).
+    # Two attempts cover late uploads; the script is idempotent.
+    - cron: '20 11 * * 1-5'
+    - cron: '20 12 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync latest Morning Call video
+        run: node scripts/sync-morning-call.mjs
