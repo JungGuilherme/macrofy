@@ -1,63 +1,106 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import {
-  Loader2,
-  Flag,
-  Globe,
-  LineChart,
-  BarChart2,
-  Newspaper,
-  Gauge,
-  ArrowRight,
-  CheckCircle2,
-} from 'lucide-react';
+import { Loader2, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const FEATURES = [
-  {
-    icon: Flag,
-    title: 'Macro Brasil',
-    description:
-      'IPCA com núcleos, Selic, IBC-Br, CAGED, câmbio e fiscal — em heatmap com tendência e histórico.',
-  },
-  {
-    icon: Globe,
-    title: 'EUA & Global',
-    description:
-      'CPI, PCE, payroll e Fed Funds direto do FRED, mais o comparativo das 20 maiores economias.',
-  },
-  {
-    icon: LineChart,
-    title: 'Curvas de Juros',
-    description:
-      'Curva DI, NTN-B e Treasuries — estrutura a termo completa, com comparação entre datas.',
-  },
-  {
-    icon: BarChart2,
-    title: 'Mercados ao Vivo',
-    description:
-      'Ibovespa, dólar, bolsas globais, fluxo B3 e valuation histórico em um só painel.',
-  },
-  {
-    icon: Newspaper,
-    title: 'Notícias & Morning Call',
-    description:
-      'Feed curado das principais fontes, organizado por tema, e o resumo diário do mercado.',
-  },
-  {
-    icon: Gauge,
-    title: 'Termômetro de Sentimento',
-    description:
-      'Índice proprietário que resume o apetite a risco do mercado brasileiro e americano.',
-  },
+/*
+ * Landing v2 — always dark, terminal-editorial. Deliberately independent of
+ * the app theme system: explicit zinc palette, blue-600 accent, mono details.
+ */
+
+const MONO = { fontFamily: "'Roboto Mono', ui-monospace, monospace" };
+
+/* ── Illustrative heatmap mock (labeled as such) ── */
+interface MockRow {
+  indicator: string;
+  value: string;
+  mom: number;
+  yoy: number;
+  trend: 'up' | 'down';
+}
+
+const MOCK_ROWS: MockRow[] = [
+  { indicator: 'IPCA 12m', value: '4,87%', mom: 0.26, yoy: -0.31, trend: 'down' },
+  { indicator: 'Selic meta', value: '14,25%', mom: 0, yoy: 3.5, trend: 'up' },
+  { indicator: 'IBC-Br (a/a)', value: '+2,1%', mom: 0.4, yoy: 0.8, trend: 'up' },
+  { indicator: 'CAGED (saldo)', value: '+142 mil', mom: -12.3, yoy: 8.2, trend: 'down' },
+  { indicator: 'USD/BRL', value: '5,42', mom: -1.2, yoy: -4.8, trend: 'down' },
+  { indicator: 'CPI EUA 12m', value: '2,6%', mom: 0.2, yoy: -0.5, trend: 'down' },
+  { indicator: 'Fed Funds', value: '3,75–4,00%', mom: 0, yoy: -1.0, trend: 'down' },
 ];
 
-const SOURCES = ['Banco Central', 'IBGE', 'FRED', 'World Bank', 'ANBIMA', 'B3'];
+function heatClass(v: number): string {
+  if (v > 1) return 'bg-emerald-500/25 text-emerald-300';
+  if (v > 0) return 'bg-emerald-500/10 text-emerald-400';
+  if (v === 0) return 'bg-zinc-800 text-zinc-400';
+  if (v > -1) return 'bg-red-500/10 text-red-400';
+  return 'bg-red-500/25 text-red-300';
+}
 
+function fmtPct(v: number): string {
+  const s = v > 0 ? '+' : '';
+  return `${s}${v.toFixed(1).replace('.', ',')}`;
+}
+
+function HeatmapMock() {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl shadow-blue-950/30">
+      {/* fake ticker strip */}
+      <div className="flex items-center gap-5 px-4 py-2 border-b border-zinc-800 bg-zinc-900/80 overflow-hidden whitespace-nowrap text-[11px]" style={MONO}>
+        <span className="text-zinc-500">IBOV</span>
+        <span className="text-emerald-400">+0,84%</span>
+        <span className="text-zinc-500">S&amp;P 500</span>
+        <span className="text-emerald-400">+0,39%</span>
+        <span className="text-zinc-500">USD/BRL</span>
+        <span className="text-red-400">−0,52%</span>
+        <span className="text-zinc-500">DI Jan/29</span>
+        <span className="text-red-400">−0,06pp</span>
+        <span className="text-zinc-500 hidden sm:inline">BRENT</span>
+        <span className="text-emerald-400 hidden sm:inline">+1,10%</span>
+      </div>
+
+      {/* heatmap table */}
+      <div className="p-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_72px_56px_56px_40px] gap-1.5 px-2 pb-2 text-[10px] uppercase tracking-wider text-zinc-500" style={MONO}>
+          <span>Indicador</span>
+          <span className="text-right">Último</span>
+          <span className="text-center">M/M</span>
+          <span className="text-center">A/A</span>
+          <span className="text-center">Tend.</span>
+        </div>
+        <div className="space-y-1">
+          {MOCK_ROWS.map((r) => (
+            <div
+              key={r.indicator}
+              className="grid grid-cols-[minmax(0,1fr)_72px_56px_56px_40px] gap-1.5 items-center px-2 py-1.5 rounded-md hover:bg-zinc-900 transition-colors"
+            >
+              <span className="text-[13px] text-zinc-200 truncate">{r.indicator}</span>
+              <span className="text-[12px] text-zinc-100 text-right" style={MONO}>{r.value}</span>
+              <span className={cn('text-[11px] text-center rounded px-1 py-0.5', heatClass(r.mom))} style={MONO}>
+                {fmtPct(r.mom)}
+              </span>
+              <span className={cn('text-[11px] text-center rounded px-1 py-0.5', heatClass(r.yoy))} style={MONO}>
+                {fmtPct(r.yoy)}
+              </span>
+              <span className="flex justify-center">
+                {r.trend === 'up'
+                  ? <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                  : <TrendingDown className="h-3.5 w-3.5 text-red-400" />}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="px-2 pt-2 text-[10px] text-zinc-600" style={MONO}>
+          visualização ilustrativa
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Login card ── */
 function LoginCard() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
@@ -77,181 +120,152 @@ function LoginCard() {
     setIsLoading(false);
   };
 
+  const inputClass =
+    'w-full h-10 rounded-lg bg-zinc-900 border border-zinc-700 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-blue-500 transition-colors';
+
   return (
-    <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-lg">
-      <h2 className="font-semibold text-foreground mb-1">Acesse a plataforma</h2>
-      <p className="text-sm text-muted-foreground mb-5">Entre com sua conta para continuar</p>
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="landing-email">Email</Label>
-          <Input
-            id="landing-email"
-            type="email"
-            placeholder="seu@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={isLoading}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="landing-password">Senha</Label>
-          <Input
-            id="landing-password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-          />
-        </div>
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Entrando…
-            </>
-          ) : (
-            'Entrar'
-          )}
-        </Button>
-      </form>
-      <p className="text-xs text-muted-foreground text-center mt-4">
-        Ainda não tem conta?{' '}
-        <Link to="/login" className="text-primary hover:underline">
-          Criar conta
+    <form onSubmit={handleLogin} className="space-y-3">
+      <input
+        type="email"
+        placeholder="seu@email.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        disabled={isLoading}
+        className={inputClass}
+        aria-label="Email"
+      />
+      <input
+        type="password"
+        placeholder="senha"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        disabled={isLoading}
+        className={inputClass}
+        aria-label="Senha"
+      />
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full h-10 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors flex items-center justify-center disabled:opacity-60"
+      >
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Entrar na plataforma'}
+      </button>
+      <p className="text-[11px] text-zinc-500 text-center">
+        Não tem conta?{' '}
+        <Link to="/login" className="text-blue-400 hover:text-blue-300">
+          Criar acesso
         </Link>
       </p>
-    </div>
+    </form>
   );
 }
 
+/* ── Feature rows (numbered, no icon grid) ── */
+const FEATURES: [string, string][] = [
+  ['Macro Brasil em heatmap', 'IPCA e núcleos, Selic, IBC-Br, CAGED, câmbio e fiscal — nível, variação e tendência numa tabela só.'],
+  ['EUA e o mundo', 'CPI, PCE, payroll e Fed Funds do FRED, mais o snapshot comparativo das 20 maiores economias.'],
+  ['Curvas de juros', 'DI, NTN-B e Treasuries — a estrutura a termo completa, comparável entre datas.'],
+  ['Mercados ao vivo', 'Ibovespa, dólar, bolsas globais, fluxo B3 e valuation histórico da bolsa brasileira.'],
+  ['Notícias sem caça', 'Feed curado das principais fontes em formato de portal, organizado por tema, com morning call diário.'],
+  ['Sentimento de mercado', 'Termômetro proprietário do apetite a risco — Brasil e EUA — atualizado diariamente.'],
+];
+
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
       {/* Top bar */}
-      <header className="max-w-6xl mx-auto flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-0">
-          <span
-            className="font-bold text-2xl tracking-tight"
-            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
-          >
+      <header className="max-w-6xl mx-auto flex items-center justify-between px-5 md:px-6 py-5">
+        <div className="flex items-center">
+          <span className="font-bold text-xl tracking-tight" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
             MF
           </span>
-          <span className="text-muted-foreground mx-2.5 text-xl font-light">|</span>
-          <span
-            className="font-semibold text-sm tracking-[0.18em] uppercase"
-            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
-          >
+          <span className="text-zinc-600 mx-2.5 font-light">|</span>
+          <span className="font-semibold text-xs tracking-[0.22em] uppercase text-zinc-300" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
             Macrofy
           </span>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/login">Entrar</Link>
-        </Button>
+        <Link
+          to="/login"
+          className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-600"
+        >
+          Entrar
+        </Link>
       </header>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-12 pb-20 grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
-        <div className="lg:col-span-3 space-y-6">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
-            Plataforma de research macroeconômico
+      <section className="max-w-6xl mx-auto px-5 md:px-6 pt-10 md:pt-16 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+        <div className="space-y-6">
+          <p className="text-[11px] tracking-[0.25em] uppercase text-blue-400" style={MONO}>
+            macro · mercados · decisão
           </p>
-          <h1
-            className="text-4xl md:text-5xl leading-tight font-bold"
-            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
-          >
-            Tudo de macro que você precisa para operar com convicção.
+          <h1 className="text-4xl md:text-[52px] leading-[1.05] font-bold tracking-tight">
+            O quadro macro completo.
+            <br />
+            <span className="text-zinc-500">Sem ruído.</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-xl">
-            Inflação, juros, atividade, emprego e mercados — Brasil, EUA e o mundo —
-            reunidos em painéis claros, atualizados todos os dias com dados oficiais.
+          <p className="text-lg text-zinc-400 max-w-md leading-relaxed">
+            Inflação, juros, atividade e mercados — Brasil e mundo — em painéis
+            que você lê em segundos. Atualizados todos os dias, direto das fontes oficiais.
           </p>
-          <ul className="space-y-2">
-            {[
-              'Dados diretos das fontes: BCB, IBGE, FRED e World Bank',
-              'Heatmaps e tendências que mostram o quadro em segundos',
-              'Atualização automática diária — sem planilha manual',
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                {item}
-              </li>
-            ))}
-          </ul>
+          <p className="text-[11px] text-zinc-600 tracking-wider" style={MONO}>
+            BCB · IBGE · FRED · WORLD BANK · ANBIMA · B3
+          </p>
+
+          <div className="pt-2 max-w-sm">
+            <LoginCard />
+          </div>
         </div>
-        <div className="lg:col-span-2 flex justify-center lg:justify-end">
-          <LoginCard />
+
+        <div className="hidden sm:block">
+          <HeatmapMock />
         </div>
       </section>
 
-      {/* Features */}
-      <section className="border-t border-border bg-card/50">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <h2
-            className="text-2xl font-bold mb-2"
-            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
-          >
-            O que você encontra no Macrofy
+      {/* Features — numbered editorial rows */}
+      <section className="border-t border-zinc-900">
+        <div className="max-w-6xl mx-auto px-5 md:px-6 py-16">
+          <h2 className="text-2xl font-bold tracking-tight mb-10">
+            O que tem dentro
           </h2>
-          <p className="text-muted-foreground mb-10">
-            Um cockpit completo para decisões de investimento informadas.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="bg-card border border-border rounded-xl p-5 hover:border-primary/40 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                  <f.icon className="h-5 w-5 text-primary" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+            {FEATURES.map(([title, body], i) => (
+              <div key={title} className="flex gap-4">
+                <span className="text-[13px] text-blue-500 pt-0.5 shrink-0" style={MONO}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className="text-[15px] font-semibold text-zinc-100 mb-1">{title}</h3>
+                  <p className="text-sm text-zinc-500 leading-relaxed">{body}</p>
                 </div>
-                <h3 className="font-semibold mb-1">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Sources strip */}
-      <section className="max-w-6xl mx-auto px-6 py-12">
-        <p className="text-center text-xs uppercase tracking-[0.2em] text-muted-foreground mb-5">
-          Dados oficiais, atualizados diariamente
-        </p>
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
-          {SOURCES.map((s) => (
-            <span key={s} className="text-sm font-medium text-muted-foreground/80">
-              {s}
-            </span>
-          ))}
-        </div>
-      </section>
-
       {/* CTA */}
-      <section className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-14 flex flex-col items-center text-center gap-4">
-          <h2
-            className="text-2xl font-bold"
-            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
+      <section className="border-t border-zinc-900">
+        <div className="max-w-6xl mx-auto px-5 md:px-6 py-14 flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className="text-xl font-semibold tracking-tight text-center md:text-left">
+            Menos abas abertas. Mais convicção.
+          </p>
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
           >
-            Pronto para decidir com dados?
-          </h2>
-          <Button size="lg" asChild>
-            <Link to="/login">
-              Acessar o Macrofy
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+            Acessar o Macrofy
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} Macrofy</span>
-          <span>Research macroeconômico independente</span>
+      <footer className="border-t border-zinc-900">
+        <div className="max-w-6xl mx-auto px-5 md:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-zinc-600" style={MONO}>
+          <span>© {new Date().getFullYear()} MACROFY</span>
+          <span>research macroeconômico independente</span>
         </div>
       </footer>
     </div>
