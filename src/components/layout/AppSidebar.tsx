@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
 import {
@@ -18,9 +19,11 @@ import {
   Newspaper,
   Flag,
   Vote,
+  Menu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface NavItemProps {
   to: string;
@@ -85,40 +88,33 @@ function SectionLabel({ collapsed, children }: { collapsed: boolean; children: R
   );
 }
 
-export function AppSidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useApp();
-  const collapsed = sidebarCollapsed;
-
+function SidebarLogo({ collapsed }: { collapsed: boolean }) {
   return (
-    <aside
-      className={cn(
-        'fixed left-0 top-0 h-screen bg-sidebar flex flex-col transition-all duration-300 z-50',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      {/* Logo */}
-      <div className={cn(
-        'flex items-center h-16 px-4 border-b border-sidebar-border',
-        collapsed && 'justify-center px-2'
-      )}>
-        {collapsed ? (
-          <span className="text-sidebar-foreground font-bold text-lg" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
+    <div className={cn(
+      'flex items-center h-16 px-4 border-b border-sidebar-border',
+      collapsed && 'justify-center px-2'
+    )}>
+      {collapsed ? (
+        <span className="text-sidebar-foreground font-bold text-lg" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
+          MF
+        </span>
+      ) : (
+        <div className="flex items-center gap-0">
+          <span className="text-sidebar-foreground font-bold text-xl tracking-tight" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
             MF
           </span>
-        ) : (
-          <div className="flex items-center gap-0">
-            <span className="text-sidebar-foreground font-bold text-xl tracking-tight" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
-              MF
-            </span>
-            <span className="text-sidebar-muted mx-2.5 text-lg font-light">|</span>
-            <span className="text-sidebar-foreground font-semibold text-sm tracking-[0.15em] uppercase" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
-              MACROFY
-            </span>
-          </div>
-        )}
-      </div>
+          <span className="text-sidebar-muted mx-2.5 text-lg font-light">|</span>
+          <span className="text-sidebar-foreground font-semibold text-sm tracking-[0.15em] uppercase" style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}>
+            MACROFY
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
-      {/* Navigation */}
+function SidebarNav({ collapsed }: { collapsed: boolean }) {
+  return (
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
         <NavItem to="/" icon={<Home className="h-5 w-5" />} label="Home" collapsed={collapsed} end />
         <NavItem to="/morning-call" icon={<Coffee className="h-5 w-5" />} label="Morning Call" collapsed={collapsed} />
@@ -167,6 +163,22 @@ export function AppSidebar() {
           />
         </div>
       </nav>
+  );
+}
+
+export function AppSidebar() {
+  const { sidebarCollapsed, toggleSidebar } = useApp();
+  const collapsed = sidebarCollapsed;
+
+  return (
+    <aside
+      className={cn(
+        'fixed left-0 top-0 h-screen bg-sidebar flex-col transition-all duration-300 z-50 hidden md:flex',
+        collapsed ? 'w-16' : 'w-64'
+      )}
+    >
+      <SidebarLogo collapsed={collapsed} />
+      <SidebarNav collapsed={collapsed} />
 
       {/* Footer */}
       <div className="p-2 border-t border-sidebar-border">
@@ -196,5 +208,43 @@ export function AppSidebar() {
         </Button>
       </div>
     </aside>
+  );
+}
+
+/** Hamburger + drawer used by the header on small screens. */
+export function MobileNav() {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  // Close the drawer whenever navigation happens
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground flex-shrink-0"
+          aria-label="Abrir menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-72 p-0 bg-sidebar border-sidebar-border flex flex-col">
+        <SidebarLogo collapsed={false} />
+        <SidebarNav collapsed={false} />
+        <div className="p-2 border-t border-sidebar-border">
+          <NavItem
+            to="/configuracoes"
+            icon={<Settings className="h-5 w-5" />}
+            label="Configurações"
+            collapsed={false}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

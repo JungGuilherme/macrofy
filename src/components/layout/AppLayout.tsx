@@ -20,18 +20,18 @@ export function AppLayout({ children }: AppLayoutProps) {
       <AppHeader />
       <div
         className={cn(
-          'pt-14 min-h-screen transition-all duration-300',
-          sidebarCollapsed ? 'pl-16' : 'pl-64'
+          'pt-14 min-h-screen transition-all duration-300 pl-0',
+          sidebarCollapsed ? 'md:pl-16' : 'md:pl-64'
         )}
       >
         {/* Global fixed ticker */}
-        <div className="sticky top-14 z-30 px-6 pt-4">
+        <div className="sticky top-14 z-30 px-3 md:px-6 pt-3 md:pt-4">
           <section className="rounded-lg overflow-hidden border border-border">
             <MarketTickerTape />
             <FeaturedNewsTicker />
           </section>
         </div>
-        <main className="p-6 pt-4">
+        <main className="p-3 md:p-6 pt-3 md:pt-4">
           {children}
         </main>
       </div>

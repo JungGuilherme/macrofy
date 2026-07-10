@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { useLang } from '@/contexts/LanguageContext';
+import { MobileNav } from '@/components/layout/AppSidebar';
 
 const roleLabels: Record<AppRole, string> = {
   admin: 'Admin/Research',
@@ -119,32 +120,34 @@ export function AppHeader() {
     <>
       <header
         className={cn(
-          'fixed top-0 right-0 h-14 bg-card border-b border-border flex items-center justify-between px-6 z-40 transition-all duration-300',
-          sidebarCollapsed ? 'left-16' : 'left-64'
+          'fixed top-0 right-0 h-14 bg-card border-b border-border flex items-center justify-between gap-2 px-3 md:px-6 z-40 transition-all duration-300 left-0',
+          sidebarCollapsed ? 'md:left-16' : 'md:left-64'
         )}
       >
+        <MobileNav />
+
         {/* Search */}
-        <div className="flex-1 max-w-xl">
+        <div className="flex-1 max-w-xl min-w-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar recomendações, relatórios, artigos..."
+              placeholder="Buscar..."
               className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 h-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchOpen(true)}
             />
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-muted-foreground bg-muted rounded">
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-muted-foreground bg-muted rounded hidden md:block">
               /
             </kbd>
           </div>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
           <button
             onClick={toggleLang}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
           >
             <Globe className="h-3.5 w-3.5" />
             {lang === "pt" ? "EN" : "PT"}
@@ -161,7 +164,7 @@ export function AppHeader() {
             variant="ghost"
             size="icon"
             onClick={() => setShowShortcuts(true)}
-            className="text-muted-foreground hover:text-foreground h-8 w-8"
+            className="text-muted-foreground hover:text-foreground h-8 w-8 hidden md:inline-flex"
           >
             <Keyboard className="h-4 w-4" />
           </Button>
@@ -169,7 +172,7 @@ export function AppHeader() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-foreground relative h-8 w-8"
+            className="text-muted-foreground hover:text-foreground relative h-8 w-8 hidden sm:inline-flex"
           >
             <Bell className="h-4 w-4" />
             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-accent rounded-full" />
