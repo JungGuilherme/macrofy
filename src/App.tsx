@@ -37,6 +37,7 @@ const MacroDashboard = lazy(() => import("./pages/MacroDashboard"));
 const Brasil = lazy(() => import("./pages/Brasil"));
 const EUA = lazy(() => import("./pages/EUA"));
 const Eleicoes2026 = lazy(() => import("./pages/Eleicoes2026"));
+const RankingAtivos = lazy(() => import("./pages/RankingAtivos"));
 
 function RouteFallback() {
   return (
@@ -97,6 +98,7 @@ function AppRoutes() {
                 <Route path="/eua" element={<EUA />} />
                 <Route path="/eua/:tab" element={<EUA />} />
                 <Route path="/tesouro-curvas" element={<TesouroCurvas />} />
+                <Route path="/ranking-ativos" element={<RankingAtivos />} />
                 <Route path="/macro" element={<MacroDashboard />} />
                 {/* Old country-level macro URLs → country pages, Macro tab */}
                 <Route path="/macro/brasil" element={<Navigate to="/brasil/macro" replace />} />
