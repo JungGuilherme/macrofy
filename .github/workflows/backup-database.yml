@@ -1,0 +1,33 @@
+name: Backup Database
+
+on:
+  schedule:
+    # Sundays 09:00 UTC (06:00 Brasília) — weekly snapshot of all tables
+    - cron: '0 9 * * 0'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Export all tables
+        run: node scripts/backup-database.mjs
+
+      # The repo is PUBLIC — never commit the data. Artifacts are only
+      # downloadable by collaborators. Retention is capped at 90 days, so
+      # keep ~12 rolling weekly snapshots; download one locally now and
+      # then if you want a permanent offline copy.
+      - name: Upload snapshot (private artifact, 90 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 90
