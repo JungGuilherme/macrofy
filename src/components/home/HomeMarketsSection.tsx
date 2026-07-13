@@ -155,7 +155,9 @@ export function HomeMarketsSection() {
         updatedAt: r.updated_at ? new Date(r.updated_at) : null,
       })) as Quote[];
     },
-    refetchInterval: 5 * 60 * 1000,
+    // Actions refreshes the table ~every 5 min; re-read often so new rows
+    // show up right after each run.
+    refetchInterval: 60 * 1000,
   });
 
   // Live overlay for the symbols the edge function covers
