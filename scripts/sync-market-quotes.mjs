@@ -18,7 +18,12 @@ const SYMBOLS = {
   '^GSPC': 'S&P 500',
   '^IXIC': 'Nasdaq',
   '^DJI': 'Dow Jones',
+  // Treasuries (CBOE yield indices + CBOT 2Y yield future)
   '^TNX': 'US 10Y',
+  '^TYX': 'US 30Y',
+  '^FVX': 'US 5Y',
+  '2YY=F': 'US 2Y',
+  '^IRX': 'US 3M',
   // Ásia
   '^N225': 'Nikkei 225',
   '000001.SS': 'Shanghai',

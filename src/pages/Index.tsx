@@ -8,6 +8,7 @@ import { RecentContent } from "@/components/home/RecentContent";
 import { FavoritesRecents } from "@/components/home/FavoritesRecents";
 import { HomeRssNews } from "@/components/home/HomeRssNews";
 import { HomeMarketsSection } from "@/components/home/HomeMarketsSection";
+import { BondsPanel } from "@/components/home/BondsPanel";
 
 export default function Index() {
   const { isLoading } = useApp();
@@ -21,6 +22,9 @@ export default function Index() {
 
       {/* Markets strip (CNBC-style category tabs) */}
       <HomeMarketsSection />
+
+      {/* Yield tables — Brazil pré curve + US treasuries */}
+      <BondsPanel />
 
       {/* Quick Access */}
       <QuickAccess />
