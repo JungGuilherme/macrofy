@@ -17,51 +17,31 @@ import {
   Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
-/* ── demo data (used until the SQL setup runs; same values as the seed) ── */
-
-const DEMO_ASSETS: RankingAsset[] = [
-  { id: 'ibov', name: 'Ibovespa', short_name: 'IBOV', color: '#2563eb', sort_order: 1, enabled: true },
-  { id: 'spx', name: 'S&P 500 (BRL)', short_name: 'S&P500', color: '#7c3aed', sort_order: 2, enabled: true },
-  { id: 'ifix', name: 'IFIX', short_name: 'IFIX', color: '#0d9488', sort_order: 3, enabled: true },
-  { id: 'imab', name: 'IMA-B', short_name: 'IMA-B', color: '#0891b2', sort_order: 4, enabled: true },
-  { id: 'cdi', name: 'CDI', short_name: 'CDI', color: '#65a30d', sort_order: 5, enabled: true },
-  { id: 'poup', name: 'Poupança', short_name: 'POUP', color: '#92400e', sort_order: 6, enabled: true },
-  { id: 'usd', name: 'Dólar', short_name: 'USD', color: '#059669', sort_order: 7, enabled: true },
-  { id: 'gold', name: 'Ouro (BRL)', short_name: 'OURO', color: '#d97706', sort_order: 8, enabled: true },
-  { id: 'btc', name: 'Bitcoin (BRL)', short_name: 'BTC', color: '#db2777', sort_order: 9, enabled: true },
-  { id: 'ipca', name: 'IPCA', short_name: 'IPCA', color: '#dc2626', sort_order: 10, enabled: true },
-];
-
-const DEMO_VALUES: Record<string, number[]> = {
-  // 2019, 2020, 2021, 2022, 2023, 2024
-  cdi: [5.96, 2.76, 4.42, 12.39, 13.04, 10.88],
-  ibov: [31.58, 2.92, -11.93, 4.69, 22.28, -10.36],
-  ifix: [35.98, -10.24, -2.28, 2.22, 15.45, -5.89],
-  imab: [22.95, 6.41, -1.26, 6.15, 14.3, -2.0],
-  usd: [4.02, 28.93, 7.39, -6.5, -7.95, 27.35],
-  gold: [22.5, 55.9, 3.5, -0.5, 4.5, 61.6],
-  spx: [35.2, 49.9, 38.2, -24.6, 14.4, 57.0],
-  btc: [97.0, 422.0, 71.0, -66.3, 134.0, 180.0],
-  poup: [4.26, 2.11, 2.99, 7.9, 8.03, 7.07],
-  ipca: [4.31, 4.52, 10.06, 5.79, 4.62, 4.83],
-};
-
-const DEMO_RETURNS: RankingReturn[] = Object.entries(DEMO_VALUES).flatMap(([assetId, vals]) =>
-  vals.map((v, i) => ({
-    id: `${assetId}-${i}`,
-    asset_id: assetId,
-    period: String(2019 + i),
-    return_pct: v,
-  }))
-);
+import { SEED_ASSETS, SEED_RETURNS } from '@/data/rankingSeed';
 
 /* ── helpers ── */
 
-function periodSort(a: string, b: string): number {
-  if (a === 'YTD') return 1;
-  if (b === 'YTD') return -1;
-  return a.localeCompare(b);
+const MONTHS_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** Chronological weight: years, then months, 'Acum. YYYY' after its year, 'Acumulado' last. */
+function periodWeight(p: string): number {
+  if (p === 'Acumulado') return Number.MAX_SAFE_INTEGER;
+  const acc = p.match(/^Acum\.?\s+(\d{4})$/i);
+  if (acc) return parseInt(acc[1]) * 1000 + 999;
+  if (/^\d{4}$/.test(p)) return parseInt(p) * 1000 + 998; // year total after its months
+  const m = p.match(/^([a-zç]{3})\/(\d{2})$/i);
+  if (m) {
+    const idx = MONTHS_PT.indexOf(m[1].toLowerCase());
+    return (2000 + parseInt(m[2])) * 1000 + (idx >= 0 ? idx + 1 : 50);
+  }
+  return Number.MAX_SAFE_INTEGER - 1;
 }
+
+function periodSort(a: string, b: string): number {
+  return periodWeight(a) - periodWeight(b);
+}
+
+const isMonthly = (p: string) => /^[a-zç]{3}\/\d{2}$/i.test(p);
 
 function fmtPct(v: number): string {
   const s = v > 0 ? '+' : '';
@@ -341,14 +321,26 @@ export default function RankingAtivos() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [view, setView] = useState<'anos' | 'meses'>('anos');
   const exportRef = useRef<HTMLDivElement>(null);
 
   const usingDemo = demo && data?.setupNeeded;
-  const assets = usingDemo ? DEMO_ASSETS : data?.assets ?? [];
-  const returns = usingDemo ? DEMO_RETURNS : data?.returns ?? [];
-  const periods = useMemo(
+  const assets = usingDemo ? SEED_ASSETS : data?.assets ?? [];
+  const returns = usingDemo ? SEED_RETURNS : data?.returns ?? [];
+
+  const allPeriods = useMemo(
     () => Array.from(new Set(returns.map((r) => r.period))).sort(periodSort),
     [returns]
+  );
+  // Anos: totals + acumulados; Meses: monthly columns (scrollable)
+  const periods = useMemo(
+    () => allPeriods.filter((p) => (view === 'meses' ? isMonthly(p) : !isMonthly(p))),
+    [allPeriods, view]
+  );
+  // The since-inception column is a stock, not a flow — never compound it.
+  const chartPeriods = useMemo(
+    () => periods.filter((p) => p !== 'Acumulado'),
+    [periods]
   );
 
   const toggle = (id: string) =>
@@ -397,7 +389,7 @@ export default function RankingAtivos() {
               (cole no chat do Lovable pedindo para rodar no banco). Depois recarregue esta página.
             </p>
             <Button variant="outline" size="sm" onClick={() => setDemo(true)}>
-              Ver demonstração com dados de exemplo
+              Ver com os dados da carta (jun/26)
             </Button>
           </CardContent>
         </Card>
@@ -412,7 +404,23 @@ export default function RankingAtivos() {
           title="Ranking de Ativos"
           subtitle="Retorno anual por classe — passe o mouse para acompanhar um ativo, clique para comparar"
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(['anos', 'meses'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  'px-3 h-8 text-xs font-medium transition-colors capitalize',
+                  view === v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           {selected.size > 0 && (
             <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
               <X className="h-3.5 w-3.5 mr-1.5" />
@@ -437,7 +445,7 @@ export default function RankingAtivos() {
                 <SheetHeader className="mb-4">
                   <SheetTitle>Editar retornos</SheetTitle>
                 </SheetHeader>
-                <AdminEditor assets={assets} returns={returns} periods={periods} />
+                <AdminEditor assets={assets} returns={returns} periods={allPeriods} />
               </SheetContent>
             </Sheet>
           )}
@@ -450,7 +458,7 @@ export default function RankingAtivos() {
           <div ref={exportRef} className="p-2 bg-card rounded-lg">
             <div className="flex items-baseline justify-between mb-3 px-1">
               <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">
-                Ranking de Ativos — retorno por ano
+                Ranking de Ativos — {view === 'anos' ? 'retorno por ano' : 'retorno mensal'}
               </h2>
               <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'Roboto Mono', monospace" }}>
                 MACROFY
@@ -473,7 +481,7 @@ export default function RankingAtivos() {
       <Card>
         <CardContent className="p-4">
           <h3 className="text-sm font-semibold text-foreground mb-2">Comparar trajetórias</h3>
-          <CompareChart assets={assets} returns={returns} periods={periods} selected={selected} />
+          <CompareChart assets={assets} returns={returns} periods={chartPeriods} selected={selected} />
         </CardContent>
       </Card>
     </div>
