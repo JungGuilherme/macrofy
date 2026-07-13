@@ -17,14 +17,21 @@ interface BondRow {
 
 /* ── shared table ── */
 
-function BondsTable({ title, rows, loading, note }: {
-  title: string; rows: BondRow[]; loading: boolean; note?: string;
+function BondsTable({ title, rows, loading, note, updatedAt }: {
+  title: string; rows: BondRow[]; loading: boolean; note?: string; updatedAt?: Date | null;
 }) {
   return (
     <div className="bg-card rounded-xl border p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Landmark className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">{title}</h3>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Landmark className="h-4 w-4 text-primary flex-shrink-0" />
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide truncate">{title}</h3>
+        </div>
+        {updatedAt && (
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0" style={MONO}>
+            atualizado {updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+        )}
       </div>
       {loading ? (
         <div className="space-y-2 py-1">
@@ -77,31 +84,65 @@ function BondsTable({ title, rows, loading, note }: {
 
 /* ── US treasuries from the market_quotes cache ── */
 
-const US_ORDER: [string, string][] = [
+// Primary: CNBC's public quote API (Tradeweb, real-time, CORS-enabled).
+// Fallback: Yahoo yield indices cached in market_quotes.
+const CNBC_SYMBOLS: [string, string][] = [
+  ['US3M', 'US 3M'],
+  ['US1Y', 'US 1Y'],
+  ['US2Y', 'US 2Y'],
+  ['US5Y', 'US 5Y'],
+  ['US10Y', 'US 10Y'],
+  ['US20Y', 'US 20Y'],
+  ['US30Y', 'US 30Y'],
+];
+const CNBC_URL =
+  'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=' +
+  CNBC_SYMBOLS.map(([s]) => s).join('|') +
+  '&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json';
+
+const YAHOO_FALLBACK: [string, string][] = [
+  ['^IRX', 'US 3M'],
+  ['2YY=F', 'US 2Y'],
+  ['^FVX', 'US 5Y'],
   ['^TNX', 'US 10Y'],
   ['^TYX', 'US 30Y'],
-  ['^FVX', 'US 5Y'],
-  ['2YY=F', 'US 2Y'],
-  ['^IRX', 'US 3M'],
 ];
 
 function useUsTreasuries() {
   return useQuery({
     queryKey: ['bonds-us'],
-    queryFn: async () => {
-      const symbols = US_ORDER.map(([s]) => s);
-      const { data, error } = await (supabase as any)
-        .from('market_quotes')
-        .select('*')
-        .in('symbol', symbols);
-      if (error) return [] as BondRow[];
-      return US_ORDER
-        .map(([symbol, name]) => {
-          const r = (data ?? []).find((q: any) => q.symbol === symbol);
-          if (!r) return null;
-          return { name, yield_: Number(r.price), chg: Number(r.change) };
-        })
-        .filter((x): x is BondRow => !!x);
+    queryFn: async (): Promise<{ rows: BondRow[]; at: Date; source: 'cnbc' | 'cache' }> => {
+      try {
+        const res = await fetch(CNBC_URL);
+        if (!res.ok) throw new Error(`CNBC HTTP ${res.status}`);
+        const json = await res.json();
+        const list = json?.FormattedQuoteResult?.FormattedQuote ?? [];
+        const rows = CNBC_SYMBOLS
+          .map(([symbol, name]) => {
+            const q = list.find((x: any) => x.symbol === symbol);
+            const y = parseFloat(String(q?.last ?? '').replace('%', ''));
+            const chg = parseFloat(String(q?.change ?? '').replace('+', ''));
+            if (!q || isNaN(y)) return null;
+            return { name, yield_: y, chg: isNaN(chg) ? null : chg };
+          })
+          .filter((x): x is BondRow => !!x);
+        if (rows.length === 0) throw new Error('empty');
+        return { rows, at: new Date(), source: 'cnbc' };
+      } catch {
+        // fallback: Yahoo yield indices from the quote cache
+        const { data } = await (supabase as any)
+          .from('market_quotes')
+          .select('*')
+          .in('symbol', YAHOO_FALLBACK.map(([s]) => s));
+        const rows = YAHOO_FALLBACK
+          .map(([symbol, name]) => {
+            const r = (data ?? []).find((q: any) => q.symbol === symbol);
+            if (!r) return null;
+            return { name, yield_: Number(r.price), chg: Number(r.change) };
+          })
+          .filter((x): x is BondRow => !!x);
+        return { rows, at: new Date(), source: 'cache' };
+      }
     },
     refetchInterval: 60 * 1000,
   });
@@ -139,19 +180,16 @@ async function fetchDiCurve(): Promise<DiContract[]> {
   return out;
 }
 
-/** Liquid vertices: January contracts across the curve (fallback: any). */
+/** All January contracts (the liquid vertices), plus the front contract
+ *  when it isn't a January — the whole readable curve. */
 function pickDiVertices(contracts: DiContract[]): DiContract[] {
-  const jans = contracts.filter((c) => c.month === 'F').sort((a, b) => a.year - b.year);
-  const pool = jans.length >= 3 ? jans : [...contracts].sort((a, b) => a.year - b.year);
-  if (pool.length <= 6) return pool;
-  // first two years are the most watched; then space out to the long end
-  const picked = [pool[0], pool[1]];
-  const rest = pool.slice(2);
-  const step = Math.max(1, Math.floor(rest.length / 4));
-  for (let i = step - 1; i < rest.length && picked.length < 6; i += step) picked.push(rest[i]);
-  const last = pool[pool.length - 1];
-  if (!picked.includes(last)) picked[picked.length - 1] = last;
-  return picked;
+  const sorted = [...contracts].sort(
+    (a, b) => a.year - b.year || 'FGHJKMNQUVXZ'.indexOf(a.month) - 'FGHJKMNQUVXZ'.indexOf(b.month)
+  );
+  const jans = sorted.filter((c) => c.month === 'F');
+  if (jans.length < 3) return sorted;
+  const front = sorted[0];
+  return front.month !== 'F' ? [front, ...jans] : jans;
 }
 
 /* ── Tesouro pré fallback (previous behaviour) ── */
@@ -220,6 +258,8 @@ function useBrCurve() {
     return true;
   }, []);
 
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+
   const load = useCallback(async () => {
     try {
       // Primary: B3 delayed feed (whole DI curve, browser-direct)
@@ -234,12 +274,13 @@ function useBrCurve() {
           }))
         );
         setSource('b3');
+        setUpdatedAt(new Date());
         return;
       }
       throw new Error('empty curve');
     } catch {
       try {
-        await loadTesouro();
+        if (await loadTesouro()) setUpdatedAt(new Date());
       } catch { /* keep whatever we have */ }
     } finally {
       setLoading(false);
@@ -252,7 +293,7 @@ function useBrCurve() {
     return () => clearInterval(t);
   }, [load]);
 
-  return { rows, loading, source };
+  return { rows, loading, source, updatedAt };
 }
 
 /* ── panel ── */
@@ -261,17 +302,20 @@ export function BondsPanel() {
   const us = useUsTreasuries();
   const br = useBrCurve();
 
+  const usRows = us.data?.rows ?? [];
+
   // Hide the whole panel only if both sides are empty after loading
-  if (!us.isLoading && !br.loading && (us.data ?? []).length === 0 && br.rows.length === 0) {
+  if (!us.isLoading && !br.loading && usRows.length === 0 && br.rows.length === 0) {
     return null;
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
       <BondsTable
         title="Juros Brasil — Curva DI"
         rows={br.rows}
         loading={br.loading}
+        updatedAt={br.updatedAt}
         note={
           br.source === 'b3'
             ? 'Futuros DI1 — B3 (delay ~15 min) · variação vs. ajuste anterior, em p.p.'
@@ -280,9 +324,14 @@ export function BondsPanel() {
       />
       <BondsTable
         title="Treasuries — EUA"
-        rows={us.data ?? []}
+        rows={usRows}
         loading={us.isLoading}
-        note="Yahoo Finance · variação do dia, em p.p."
+        updatedAt={us.data?.at ?? null}
+        note={
+          us.data?.source === 'cnbc'
+            ? 'CNBC/Tradeweb (tempo real) · variação do dia, em p.p.'
+            : 'Yahoo Finance (cache) · variação do dia, em p.p.'
+        }
       />
     </div>
   );
