@@ -32,17 +32,30 @@ interface NavItemProps {
   label: string;
   collapsed: boolean;
   badge?: string;
+  live?: boolean;
   end?: boolean;
 }
 
-function NavItem({ to, icon, label, collapsed, badge, end }: NavItemProps) {
+function LiveBadge() {
+  return (
+    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-500 text-[10px] font-bold tracking-wider">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+      </span>
+      AO VIVO
+    </span>
+  );
+}
+
+function NavItem({ to, icon, label, collapsed, badge, live, end }: NavItemProps) {
   const content = (
     <NavLink
       to={to}
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+          'relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
           'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground',
           isActive && 'bg-sidebar-accent text-sidebar-foreground font-medium',
           collapsed && 'justify-center px-2'
@@ -53,12 +66,19 @@ function NavItem({ to, icon, label, collapsed, badge, end }: NavItemProps) {
       {!collapsed && (
         <>
           <span className="flex-1 text-sm">{label}</span>
+          {live && <LiveBadge />}
           {badge && (
             <span className="px-1.5 py-0.5 text-xs rounded-full bg-gold/20 text-gold">
               {badge}
             </span>
           )}
         </>
+      )}
+      {collapsed && live && (
+        <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
       )}
     </NavLink>
   );
@@ -114,11 +134,36 @@ function SidebarLogo({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/** Weekdays 08:00–08:30 (Brasília) — the Morning Call live window. */
+function useMorningCallLive(): boolean {
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Sao_Paulo',
+        hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false,
+      }).formatToParts(now);
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+      const weekday = get('weekday');
+      const hour = parseInt(get('hour'), 10);
+      const minute = parseInt(get('minute'), 10);
+      const isWeekday = !['Sat', 'Sun'].includes(weekday);
+      setLive(isWeekday && hour === 8 && minute <= 30);
+    };
+    check();
+    const t = setInterval(check, 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return live;
+}
+
 function SidebarNav({ collapsed }: { collapsed: boolean }) {
+  const mcLive = useMorningCallLive();
   return (
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
         <NavItem to="/" icon={<Home className="h-5 w-5" />} label="Home" collapsed={collapsed} end />
-        <NavItem to="/morning-call" icon={<Coffee className="h-5 w-5" />} label="Morning Call" collapsed={collapsed} />
+        <NavItem to="/morning-call" icon={<Coffee className="h-5 w-5" />} label="Morning Call" collapsed={collapsed} live={mcLive} />
         <NavItem to="/noticias" icon={<Newspaper className="h-5 w-5" />} label="Notícias" collapsed={collapsed} />
 
         <SectionLabel collapsed={collapsed}>Mercados & Macro</SectionLabel>

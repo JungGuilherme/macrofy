@@ -9,17 +9,6 @@ import { FavoritesRecents } from "@/components/home/FavoritesRecents";
 import { HomeRssNews } from "@/components/home/HomeRssNews";
 import { HomeMarketsSection } from "@/components/home/HomeMarketsSection";
 
-function HomeDate() {
-  const dateLabel = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return (
-    <p className="text-sm text-muted-foreground capitalize text-right pb-1">{dateLabel}</p>
-  );
-}
-
 export default function Index() {
   const { isLoading } = useApp();
 
@@ -29,8 +18,6 @@ export default function Index() {
 
   return (
     <div className="space-y-4 animate-fade-up">
-
-      <HomeDate />
 
       {/* Markets strip (CNBC-style category tabs) */}
       <HomeMarketsSection />

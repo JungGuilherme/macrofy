@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -101,24 +102,49 @@ function fmt(price: number, currency?: string): string {
   return price.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: digits });
 }
 
-function QuoteCard({ q, entry }: { q: Quote; entry: Entry }) {
+type ThemeName = 'light' | 'dark' | 'bloomberg';
+
+function QuoteCard({ q, entry, theme }: { q: Quote; entry: Entry; theme: ThemeName }) {
   const up = q.changePercent >= 0;
+
+  // Per-theme looks:
+  //  light     — solid green/red block, white text (CNBC style)
+  //  dark      — dark card, neutral text, colored arrow/variation
+  //  bloomberg — hollow box on black, yellow labels, colored numbers
+  const box = cn(
+    'rounded-lg px-4 py-3 min-w-[185px] flex-1 shadow-sm',
+    theme === 'light' && (up ? 'bg-emerald-700 text-white' : 'bg-red-700 text-white'),
+    theme === 'dark' && 'bg-muted/40 border border-border text-foreground',
+    theme === 'bloomberg' && 'bg-black border border-yellow-400/40'
+  );
+  const nameCls = cn(
+    'text-[11px] font-bold uppercase tracking-wide truncate',
+    theme === 'bloomberg' && 'text-yellow-400'
+  );
+  const priceCls = cn(
+    'text-[15px] font-bold tabular-nums whitespace-nowrap',
+    theme === 'bloomberg' && 'text-yellow-400'
+  );
+  const varColor =
+    theme === 'light'
+      ? 'text-white'
+      : up
+        ? 'text-emerald-500'
+        : 'text-red-500';
+  const timeCls = cn(
+    'mt-1.5 text-[9px] uppercase tracking-wider',
+    theme === 'light' ? 'text-white/60' : theme === 'bloomberg' ? 'text-yellow-400/50' : 'text-muted-foreground'
+  );
+
   return (
-    <div
-      className={cn(
-        'rounded-lg px-4 py-3 min-w-[185px] flex-1 text-white shadow-sm',
-        up ? 'bg-emerald-700' : 'bg-red-700'
-      )}
-    >
+    <div className={box}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[11px] font-bold uppercase tracking-wide truncate">
-          {entry.name}
-        </span>
-        <span className="text-[15px] font-bold tabular-nums whitespace-nowrap" style={{ fontFamily: "'Roboto Mono', monospace" }}>
+        <span className={nameCls}>{entry.name}</span>
+        <span className={priceCls} style={{ fontFamily: "'Roboto Mono', monospace" }}>
           {entry.prefix ?? ''}{fmt(q.price, q.currency)}{entry.suffix ?? ''}
         </span>
       </div>
-      <div className="flex items-center justify-between mt-1.5">
+      <div className={cn('flex items-center justify-between mt-1.5', varColor)}>
         <span className="text-sm leading-none">{up ? '▲' : '▼'}</span>
         <span className="text-[12px] font-semibold tabular-nums" style={{ fontFamily: "'Roboto Mono', monospace" }}>
           {up ? '+' : ''}{q.change.toFixed(2)}{'  '}
@@ -126,7 +152,7 @@ function QuoteCard({ q, entry }: { q: Quote; entry: Entry }) {
         </span>
       </div>
       {q.updatedAt && (
-        <div className="mt-1.5 text-[9px] uppercase tracking-wider text-white/60">
+        <div className={timeCls}>
           Últ. atualização {q.updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
@@ -135,6 +161,7 @@ function QuoteCard({ q, entry }: { q: Quote; entry: Entry }) {
 }
 
 export function HomeMarketsSection() {
+  const { theme } = useTheme();
   const [tab, setTab] = useState('brasil');
   const [liveQuotes, setLiveQuotes] = useState<Quote[]>([]);
   const [liveAt, setLiveAt] = useState<Date | null>(null);
@@ -236,7 +263,7 @@ export function HomeMarketsSection() {
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
           {cards.map(({ entry, q }) => (
-            <QuoteCard key={entry.cache} q={q} entry={entry} />
+            <QuoteCard key={entry.cache} q={q} entry={entry} theme={theme as ThemeName} />
           ))}
         </div>
       )}
