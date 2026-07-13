@@ -107,7 +107,54 @@ function useUsTreasuries() {
   });
 }
 
-/* ── Brazil pré curve (Tesouro Direto) with day-over-day change ── */
+/* ── Brazil DI curve — straight from B3's public (CORS-enabled) API ── */
+
+const B3_DI_URL = 'https://cotacao.b3.com.br/mds/api/v1/DerivativeQuotation/DI1';
+const MONTH_CODE: Record<string, string> = {
+  F: 'Jan', G: 'Fev', H: 'Mar', J: 'Abr', K: 'Mai', M: 'Jun',
+  N: 'Jul', Q: 'Ago', U: 'Set', V: 'Out', X: 'Nov', Z: 'Dez',
+};
+
+interface DiContract { symb: string; rate: number; prev: number; year: number; month: string }
+
+async function fetchDiCurve(): Promise<DiContract[]> {
+  const res = await fetch(B3_DI_URL);
+  if (!res.ok) throw new Error(`B3 HTTP ${res.status}`);
+  const json = await res.json();
+  const out: DiContract[] = [];
+  for (const s of json?.Scty ?? []) {
+    const symb: string = s.symb ?? '';
+    const m = symb.match(/^DI1([FGHJKMNQUVXZ])(\d{2})$/);
+    const cur = s.SctyQtn?.curPrc;
+    const prev = s.SctyQtn?.prvsDayAdjstmntPric;
+    if (!m || !cur || cur <= 0) continue;
+    out.push({
+      symb,
+      rate: cur,
+      prev: prev && prev > 0 ? prev : cur,
+      year: 2000 + parseInt(m[2]),
+      month: m[1],
+    });
+  }
+  return out;
+}
+
+/** Liquid vertices: January contracts across the curve (fallback: any). */
+function pickDiVertices(contracts: DiContract[]): DiContract[] {
+  const jans = contracts.filter((c) => c.month === 'F').sort((a, b) => a.year - b.year);
+  const pool = jans.length >= 3 ? jans : [...contracts].sort((a, b) => a.year - b.year);
+  if (pool.length <= 6) return pool;
+  // first two years are the most watched; then space out to the long end
+  const picked = [pool[0], pool[1]];
+  const rest = pool.slice(2);
+  const step = Math.max(1, Math.floor(rest.length / 4));
+  for (let i = step - 1; i < rest.length && picked.length < 6; i += step) picked.push(rest[i]);
+  const last = pool[pool.length - 1];
+  if (!picked.includes(last)) picked[picked.length - 1] = last;
+  return picked;
+}
+
+/* ── Tesouro pré fallback (previous behaviour) ── */
 
 interface CurvePoint { anos: number; taxa: number; vencimento_label: string }
 
@@ -140,49 +187,72 @@ function pickMaturities(pontos: CurvePoint[]): CurvePoint[] {
 function useBrCurve() {
   const [rows, setRows] = useState<BondRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<'b3' | 'tesouro' | null>(null);
+
+  // Fallback: Tesouro Prefixado curve, change vs previous business day
+  const loadTesouro = useCallback(async () => {
+    const today = await fetchCurve();
+    if (!today || today.pontos.length === 0) return false;
+
+    let prev: { base: string; pontos: CurvePoint[] } | null = null;
+    const base = new Date(today.base + 'T00:00:00');
+    for (let back = 1; back <= 5 && !prev; back++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - back);
+      const candidate = await fetchCurve(d.toISOString().slice(0, 10));
+      if (candidate && candidate.base !== today.base && candidate.pontos.length > 0) {
+        prev = candidate;
+      }
+    }
+
+    const picked = pickMaturities(today.pontos);
+    setRows(
+      picked.map((p) => {
+        const prevPoint = prev?.pontos.find((x) => x.vencimento_label === p.vencimento_label);
+        return {
+          name: `Pré ${p.vencimento_label}`,
+          yield_: p.taxa,
+          chg: prevPoint ? Number((p.taxa - prevPoint.taxa).toFixed(3)) : null,
+        };
+      })
+    );
+    setSource('tesouro');
+    return true;
+  }, []);
 
   const load = useCallback(async () => {
     try {
-      const today = await fetchCurve();
-      if (!today || today.pontos.length === 0) return;
-
-      // previous business day: walk back from the base date until the
-      // API returns an older base
-      let prev: { base: string; pontos: CurvePoint[] } | null = null;
-      const base = new Date(today.base + 'T00:00:00');
-      for (let back = 1; back <= 5 && !prev; back++) {
-        const d = new Date(base);
-        d.setDate(d.getDate() - back);
-        const dateStr = d.toISOString().slice(0, 10);
-        const candidate = await fetchCurve(dateStr);
-        if (candidate && candidate.base !== today.base && candidate.pontos.length > 0) {
-          prev = candidate;
-        }
+      // Primary: B3 delayed feed (whole DI curve, browser-direct)
+      const contracts = await fetchDiCurve();
+      const picked = pickDiVertices(contracts);
+      if (picked.length > 0) {
+        setRows(
+          picked.map((c) => ({
+            name: `DI ${MONTH_CODE[c.month]}/${String(c.year).slice(2)}`,
+            yield_: c.rate,
+            chg: Number((c.rate - c.prev).toFixed(3)),
+          }))
+        );
+        setSource('b3');
+        return;
       }
-
-      const picked = pickMaturities(today.pontos);
-      setRows(
-        picked.map((p) => {
-          const prevPoint = prev?.pontos.find((x) => x.vencimento_label === p.vencimento_label);
-          return {
-            name: `Pré ${p.vencimento_label}`,
-            yield_: p.taxa,
-            chg: prevPoint ? Number((p.taxa - prevPoint.taxa).toFixed(3)) : null,
-          };
-        })
-      );
+      throw new Error('empty curve');
+    } catch {
+      try {
+        await loadTesouro();
+      } catch { /* keep whatever we have */ }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTesouro]);
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 15 * 60 * 1000);
+    const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [load]);
 
-  return { rows, loading };
+  return { rows, loading, source };
 }
 
 /* ── panel ── */
@@ -199,10 +269,14 @@ export function BondsPanel() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <BondsTable
-        title="Juros Brasil — Curva Pré"
+        title="Juros Brasil — Curva DI"
         rows={br.rows}
         loading={br.loading}
-        note="Tesouro Prefixado (Tesouro Transparente) · variação vs. dia útil anterior, em p.p."
+        note={
+          br.source === 'b3'
+            ? 'Futuros DI1 — B3 (delay ~15 min) · variação vs. ajuste anterior, em p.p.'
+            : 'Tesouro Prefixado (fallback) · variação vs. dia útil anterior, em p.p.'
+        }
       />
       <BondsTable
         title="Treasuries — EUA"
