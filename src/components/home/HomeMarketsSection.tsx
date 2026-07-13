@@ -159,6 +159,7 @@ export function HomeMarketsSection() {
   });
 
   // Live overlay for the symbols the edge function covers
+  const [liveLoading, setLiveLoading] = useState(true);
   const fetchLive = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke('market-ticker');
@@ -169,6 +170,8 @@ export function HomeMarketsSection() {
       }
     } catch {
       /* cache still renders */
+    } finally {
+      setLiveLoading(false);
     }
   }, []);
 
@@ -192,7 +195,8 @@ export function HomeMarketsSection() {
       .filter((x): x is { entry: Entry; q: Quote } => !!x);
   }, [category, liveQuotes, liveAt, cacheQuotes]);
 
-  const loading = cacheLoading && liveQuotes.length === 0;
+  // Only declare "no data" after BOTH sources finished their first attempt
+  const loading = (cacheLoading || liveLoading) && cards.length === 0;
 
   return (
     <div className="bg-card rounded-xl border p-4">
