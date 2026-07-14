@@ -45,28 +45,32 @@ function BondsTable({ title, rows, loading, note, updatedAt }: {
             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="text-left font-medium pb-1.5">Nome</th>
               <th className="text-right font-medium pb-1.5">Taxa</th>
-              <th className="text-right font-medium pb-1.5">Var.</th>
+              <th className="text-right font-medium pb-1.5">Var. p.p.</th>
+              <th className="text-right font-medium pb-1.5">Var. %</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((r) => {
               const up = (r.chg ?? 0) >= 0;
+              const prevYield = r.chg !== null ? r.yield_ - r.chg : null;
+              const chgPct = r.chg !== null && prevYield ? (r.chg / prevYield) * 100 : null;
+              const varCls = cn(
+                'py-1.5 text-right tabular-nums text-[13px] font-semibold',
+                r.chg === null ? 'text-muted-foreground' : up ? 'text-emerald-500' : 'text-red-500'
+              );
               return (
                 <tr key={r.name}>
-                  <td className="py-1.5 font-semibold text-foreground text-[13px]">{r.name}</td>
+                  <td className="py-1.5 font-semibold text-foreground text-[13px] whitespace-nowrap">{r.name}</td>
                   <td className="py-1.5 text-right tabular-nums text-foreground" style={MONO}>
                     {r.yield_.toFixed(3).replace('.', ',')}
                   </td>
-                  <td
-                    className={cn(
-                      'py-1.5 text-right tabular-nums text-[13px] font-semibold',
-                      r.chg === null ? 'text-muted-foreground' : up ? 'text-emerald-500' : 'text-red-500'
-                    )}
-                    style={MONO}
-                  >
-                    {r.chg === null ? '—' : (
+                  <td className={varCls} style={MONO}>
+                    {r.chg === null ? '—' : `${up ? '+' : ''}${r.chg.toFixed(3).replace('.', ',')}`}
+                  </td>
+                  <td className={varCls} style={MONO}>
+                    {chgPct === null ? '—' : (
                       <>
-                        {up ? '+' : ''}{r.chg.toFixed(3).replace('.', ',')}{' '}
+                        {up ? '+' : ''}{chgPct.toFixed(2).replace('.', ',')}%{' '}
                         <span className="text-xs">{up ? '▲' : '▼'}</span>
                       </>
                     )}
@@ -298,41 +302,59 @@ function useBrCurve() {
 
 /* ── panel ── */
 
-export function BondsPanel() {
+interface BondsPanelProps {
+  /** Which tables to render. */
+  show?: 'both' | 'br' | 'us';
+  /** Force vertical stacking (for narrow sidebars). */
+  stacked?: boolean;
+}
+
+export function BondsPanel({ show = 'both', stacked = false }: BondsPanelProps) {
   const us = useUsTreasuries();
   const br = useBrCurve();
 
   const usRows = us.data?.rows ?? [];
+  const showBr = show !== 'us';
+  const showUs = show !== 'br';
 
-  // Hide the whole panel only if both sides are empty after loading
-  if (!us.isLoading && !br.loading && usRows.length === 0 && br.rows.length === 0) {
-    return null;
-  }
+  // Hide the whole panel only if every visible side is empty after loading
+  const brEmpty = !br.loading && br.rows.length === 0;
+  const usEmpty = !us.isLoading && usRows.length === 0;
+  if ((!showBr || brEmpty) && (!showUs || usEmpty)) return null;
+
+  const brTable = showBr && (
+    <BondsTable
+      title="Juros Brasil — Curva DI"
+      rows={br.rows}
+      loading={br.loading}
+      updatedAt={br.updatedAt}
+      note={
+        br.source === 'b3'
+          ? 'Futuros DI1 — B3 (delay ~15 min) · variação vs. ajuste anterior'
+          : 'Tesouro Prefixado (fallback) · variação vs. dia útil anterior'
+      }
+    />
+  );
+  const usTable = showUs && (
+    <BondsTable
+      title="Treasuries — EUA"
+      rows={usRows}
+      loading={us.isLoading}
+      updatedAt={us.data?.at ?? null}
+      note={
+        us.data?.source === 'cnbc'
+          ? 'CNBC/Tradeweb (tempo real) · variação do dia'
+          : 'Yahoo Finance (cache) · variação do dia'
+      }
+    />
+  );
+
+  if (show !== 'both') return <>{brTable}{usTable}</>;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-      <BondsTable
-        title="Juros Brasil — Curva DI"
-        rows={br.rows}
-        loading={br.loading}
-        updatedAt={br.updatedAt}
-        note={
-          br.source === 'b3'
-            ? 'Futuros DI1 — B3 (delay ~15 min) · variação vs. ajuste anterior, em p.p.'
-            : 'Tesouro Prefixado (fallback) · variação vs. dia útil anterior, em p.p.'
-        }
-      />
-      <BondsTable
-        title="Treasuries — EUA"
-        rows={usRows}
-        loading={us.isLoading}
-        updatedAt={us.data?.at ?? null}
-        note={
-          us.data?.source === 'cnbc'
-            ? 'CNBC/Tradeweb (tempo real) · variação do dia, em p.p.'
-            : 'Yahoo Finance (cache) · variação do dia, em p.p.'
-        }
-      />
+    <div className={cn('grid gap-4 items-start', stacked ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2')}>
+      {brTable}
+      {usTable}
     </div>
   );
 }

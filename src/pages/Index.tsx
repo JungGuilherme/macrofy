@@ -23,9 +23,6 @@ export default function Index() {
       {/* Markets strip (CNBC-style category tabs) */}
       <HomeMarketsSection />
 
-      {/* Yield tables — Brazil pré curve + US treasuries */}
-      <BondsPanel />
-
       {/* Quick Access */}
       <QuickAccess />
 
@@ -38,6 +35,10 @@ export default function Index() {
         </div>
         <div className="space-y-4">
           <HomeRssNews />
+
+          {/* Yield tables — DI curve + US treasuries, stacked */}
+          <BondsPanel stacked />
+
           <RecentContent />
           <FavoritesRecents />
         </div>

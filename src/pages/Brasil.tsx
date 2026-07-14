@@ -14,6 +14,7 @@ import CountryMacroPanel from "@/components/macro/CountryMacroPanel";
 
 import BrazilCurvePanel from "@/components/curves/BrazilCurvePanel";
 import SentimentIndexSection from "@/components/sentiment/SentimentIndexSection";
+import { BondsPanel } from "@/components/home/BondsPanel";
 
 import { useSentimentIndex } from "@/hooks/useSentimentIndex";
 import SentimentGauge from "@/components/sentiment/SentimentGauge";
@@ -120,6 +121,7 @@ export default function Brasil() {
 
         {/* RENDA FIXA */}
         <TabsContent value="renda-fixa" className="space-y-4 mt-4">
+          <BondsPanel show="br" />
           <BrazilCurvePanel />
         </TabsContent>
 

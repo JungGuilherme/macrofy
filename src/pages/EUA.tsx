@@ -7,6 +7,7 @@ import CountryMacroPanel from "@/components/macro/CountryMacroPanel";
 
 import USCurvePanel from "@/components/curves/USCurvePanel";
 import SentimentIndexSection from "@/components/sentiment/SentimentIndexSection";
+import { BondsPanel } from "@/components/home/BondsPanel";
 
 const koyfinUSHtml = `<iframe width="100%" height="100%" src="https://app.koyfin.com/wei/simple/?columns=checkboxBtn,40;name,200;ticker-string,100;lastPrice,100;chg1dPct_adj,100;chg1wPct_adj,100;chg1mPct_adj,100;chg1yPct_adj,100;chgYTDPct_adj,100;low52w,100;high52w,100;performance,200&activeGroupId=region&sortColumn=&order=desc" frameBorder="0"></iframe>`;
 
@@ -84,6 +85,7 @@ export default function EUA() {
 
         {/* RENDA FIXA */}
         <TabsContent value="renda-fixa" className="space-y-4 mt-4">
+          <BondsPanel show="us" />
           <USCurvePanel />
         </TabsContent>
 
