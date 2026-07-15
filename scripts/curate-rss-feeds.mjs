@@ -91,6 +91,8 @@ for (const r of replacements) {
 const additions = [
   { name: 'InfoMoney Economia', feed_url: GN('site:infomoney.com.br/economia'), themes: ['macro'] },
   { name: 'InfoMoney Mercados', feed_url: GN('site:infomoney.com.br/mercados'), themes: ['mercados'] },
+  { name: 'Valor — Brasil', feed_url: GN('site:valor.globo.com/brasil'), themes: ['macro'] },
+  { name: 'Valor — Finanças', feed_url: GN('site:valor.globo.com/financas'), themes: ['mercados'] },
 ];
 const maxOrder = Math.max(0, ...feeds.map((f) => f.display_order ?? 0));
 for (const [i, a] of additions.entries()) {
