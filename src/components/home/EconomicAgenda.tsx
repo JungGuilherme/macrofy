@@ -8,6 +8,15 @@ export function EconomicAgenda() {
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'bloomberg';
 
+  // Cross-origin iframe: color control is filter-only. Dark inverts;
+  // bloomberg adds a sepia pass that pushes the inverted whites to amber.
+  const filter =
+    theme === 'bloomberg'
+      ? 'invert(0.92) hue-rotate(180deg) sepia(0.6) saturate(1.7) hue-rotate(-12deg) contrast(0.98)'
+      : isDark
+        ? 'invert(0.90) hue-rotate(180deg) contrast(0.95)'
+        : undefined;
+
   return (
     <div className="bg-card rounded-xl border p-5">
       <div className="section-header mb-4">
@@ -24,10 +33,12 @@ export function EconomicAgenda() {
         <iframe
           src="https://sslecal2.investing.com/?ecoDayBackground=%235e5e5e&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex,_balance&importance=2,3&features=datepicker,timezone&countries=32,37,5,35,4,72&calType=day&timeZone=12&lang=12"
           style={{
-            width: '100%',
+            width: 'calc(100% + 2px)',
             height: '467px',
             border: 'none',
-            filter: isDark ? 'invert(0.90) hue-rotate(180deg) contrast(0.95)' : undefined,
+            marginLeft: '-1px',
+            display: 'block',
+            filter,
           }}
           allowTransparency={true}
           title="Calendário Econômico Investing.com"

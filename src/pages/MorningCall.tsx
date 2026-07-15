@@ -191,39 +191,46 @@ export default function MorningCall() {
         </Card>
       )}
 
-      {/* Video */}
-      {showVideo ? (
-        <div className="max-w-4xl mx-auto w-full space-y-2">
-          <div className="aspect-video rounded-xl overflow-hidden border border-border shadow-lg">
-            <iframe
-              src={embedUrl}
-              title="Morning Call"
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-          {selectedVideo && (
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-sm font-medium text-foreground truncate">{selectedVideo.title}</p>
-              <Button variant="outline" size="sm" onClick={() => setSelectedVideo(null)}>
-                <Coffee className="h-3.5 w-3.5 mr-2" />
-                Voltar ao Morning Call de hoje
-              </Button>
+      {/* Video + futures side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <div className="lg:col-span-2">
+          {showVideo ? (
+            <div className="w-full space-y-2">
+              <div className="aspect-video rounded-xl overflow-hidden border border-border shadow-lg">
+                <iframe
+                  src={embedUrl}
+                  title="Morning Call"
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              {selectedVideo && (
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground truncate">{selectedVideo.title}</p>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedVideo(null)}>
+                    <Coffee className="h-3.5 w-3.5 mr-2" />
+                    Voltar ao Morning Call de hoje
+                  </Button>
+                </div>
+              )}
             </div>
+          ) : (
+            <Card>
+              <CardContent className="py-16 text-center space-y-2">
+                <Coffee className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  O Morning Call de hoje ainda não foi publicado. O vídeo chega todo dia útil
+                  por volta das 8h20.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
-      ) : (
-        <Card>
-          <CardContent className="py-16 text-center space-y-2">
-            <Coffee className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-            <p className="text-sm text-muted-foreground">
-              O Morning Call de hoje ainda não foi publicado. O vídeo chega todo dia útil
-              por volta das 8h20.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        <div className="lg:col-span-1">
+          <GlobalFuturesWatchlist />
+        </div>
+      </div>
 
       {/* Other channel videos */}
       {gridVideos.length > 0 && (
@@ -264,9 +271,6 @@ export default function MorningCall() {
           </div>
         </div>
       )}
-
-      {/* Futures watchlist */}
-      <GlobalFuturesWatchlist />
     </div>
   );
 }
