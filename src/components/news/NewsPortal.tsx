@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, ExternalLink, Pencil, Trash2, Rss, Clock } from 'lucide-react';
+import { Star, ExternalLink, Pencil, Trash2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { themeChipClass, themeLabel } from '@/lib/newsThemes';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,14 @@ interface NewsPortalProps {
   onToggleFeatured?: (row: AggregatedNewsRow) => void;
   onEditManual?: (row: AggregatedNewsRow) => void;
   onDeleteManual?: (row: AggregatedNewsRow) => void;
+}
+
+/** Google News feeds ship HTML/anchor-URLs as description — strip and drop useless ones. */
+function cleanSummary(s?: string): string | undefined {
+  if (!s) return undefined;
+  const text = s.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+  if (!text || /^https?:\/\//i.test(text) || text.includes('news.google.com')) return undefined;
+  return text;
 }
 
 function timeAgo(d: Date): string {
@@ -123,9 +131,9 @@ function HeroCard({ row, adminProps }: { row: AggregatedNewsRow; adminProps: Omi
         >
           {row.title}
         </h2>
-        {row.summary && (
+        {cleanSummary(row.summary) && (
           <p className={cn('text-sm line-clamp-2', row.imageUrl ? 'text-white/80' : 'text-muted-foreground')}>
-            {row.summary}
+            {cleanSummary(row.summary)}
           </p>
         )}
         <div className={cn('flex items-center gap-2 text-[11px]', row.imageUrl ? 'text-white/70' : 'text-muted-foreground')}>
@@ -184,8 +192,8 @@ function FeedCard({ row, adminProps }: { row: AggregatedNewsRow; adminProps: Omi
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'group flex gap-4 items-start rounded-xl border bg-card p-4 transition-colors hover:border-primary/40',
-        row.isFeatured && 'border-amber-500/40 bg-amber-500/5',
+        'group flex gap-4 items-start px-4 py-4 transition-colors hover:bg-accent/40',
+        row.isFeatured && 'bg-amber-500/5',
       )}
     >
       {row.imageUrl && (
@@ -201,9 +209,9 @@ function FeedCard({ row, adminProps }: { row: AggregatedNewsRow; adminProps: Omi
           {row.isFeatured && <Star className="inline h-3.5 w-3.5 mb-0.5 mr-1 fill-amber-500 text-amber-500" />}
           {row.title}
         </h3>
-        {row.summary && (
+        {cleanSummary(row.summary) && (
           <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
-            {row.summary}
+            {cleanSummary(row.summary)}
           </p>
         )}
         <MetaLine row={row} />
@@ -253,39 +261,6 @@ function MaisLidasRail({ feeds }: { feeds: RssFeed[] }) {
   );
 }
 
-/** Right rail: the main RSS sources and their freshness. */
-function SourcesRail({ feeds }: { feeds: RssFeed[] }) {
-  const active = feeds
-    .filter((f) => f.is_active !== false)
-    .sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999));
-
-  if (active.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Rss className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">Fontes principais</h3>
-      </div>
-      <ul className="space-y-2.5">
-        {active.slice(0, 10).map((feed) => {
-          const latest = feed.items?.[0];
-          const latestDate = latest ? new Date(latest.pubDate) : null;
-          return (
-            <li key={feed.id} className="flex items-baseline justify-between gap-2 text-[13px]">
-              <span className="font-medium text-foreground truncate">{feed.name}</span>
-              <span className="text-[11px] text-muted-foreground shrink-0">
-                {feed.items?.length ?? 0} itens
-                {latestDate && !isNaN(latestDate.getTime()) && ` · ${timeAgo(latestDate)}`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 const PAGE_SIZE = 20;
 
 export function NewsPortal({ rows, feeds, ...adminProps }: NewsPortalProps) {
@@ -294,7 +269,7 @@ export function NewsPortal({ rows, feeds, ...adminProps }: NewsPortalProps) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card py-16 text-center">
-        <p className="text-sm text-muted-foreground">Nenhuma notícia encontrada com os filtros atuais.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma notícia no momento — os feeds atualizam a cada 30 minutos.</p>
       </div>
     );
   }
@@ -325,12 +300,14 @@ export function NewsPortal({ rows, feeds, ...adminProps }: NewsPortalProps) {
 
       {/* Feed + rail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <div className="lg:col-span-2 space-y-3">
-          {feedRows.slice(0, visible).map((row) => (
-            <FeedCard key={row.id} row={row} adminProps={adminProps} />
-          ))}
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border bg-card divide-y divide-border overflow-hidden">
+            {feedRows.slice(0, visible).map((row) => (
+              <FeedCard key={row.id} row={row} adminProps={adminProps} />
+            ))}
+          </div>
           {feedRows.length > visible && (
-            <div className="flex justify-center pt-1">
+            <div className="flex justify-center pt-4">
               <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
                 Carregar mais ({feedRows.length - visible} restantes)
               </Button>
@@ -339,7 +316,6 @@ export function NewsPortal({ rows, feeds, ...adminProps }: NewsPortalProps) {
         </div>
         <div className="space-y-4 lg:sticky lg:top-32">
           <MaisLidasRail feeds={feeds} />
-          <SourcesRail feeds={feeds} />
         </div>
       </div>
     </div>

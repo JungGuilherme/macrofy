@@ -2,19 +2,16 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Newspaper, Loader2, Search, Plus, Star, Tags } from 'lucide-react';
+import { Loader2, Search, Plus, Tags } from 'lucide-react';
 import { useRssFeeds, buildAggregatedNews, type AggregatedNewsRow } from '@/hooks/useRssFeeds';
 import {
   useCuratedNews, useDeleteCuratedNews, useToggleFeaturedNews,
   type CuratedNews,
 } from '@/hooks/useCuratedNews';
-import { NEWS_THEMES, type NewsTheme } from '@/lib/newsThemes';
-import { useThemeLabels, resolveLabel, getOrderedThemes } from '@/hooks/useThemeLabels';
 import { NewsPortal } from '@/components/news/NewsPortal';
 import { ManualNewsDrawer } from '@/components/news/ManualNewsDrawer';
 import { ThemeManagementDrawer } from '@/components/news/ThemeManagementDrawer';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
-import { cn } from '@/lib/utils';
 
 export default function News() {
   const { role } = useAuth();
@@ -22,15 +19,12 @@ export default function News() {
 
   const { data: feeds = [], isLoading: feedsLoading } = useRssFeeds();
   const { data: manualNews = [], isLoading: manualLoading } = useCuratedNews();
-  const { data: themeOverrides } = useThemeLabels();
   const deleteManualMut = useDeleteCuratedNews();
   const toggleFeaturedMut = useToggleFeaturedNews();
 
   const isLoading = feedsLoading || manualLoading;
 
   const [search, setSearch] = useState('');
-  const [theme, setTheme] = useState<NewsTheme | 'all'>('all');
-  const [onlyFeatured, setOnlyFeatured] = useState(false);
 
   const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
   const [manualDrawerOpen, setManualDrawerOpen] = useState(false);
@@ -40,13 +34,8 @@ export default function News() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const rows = useMemo(
-    () => buildAggregatedNews(feeds, manualNews as any, { theme, onlyFeatured, search }),
-    [feeds, manualNews, theme, onlyFeatured, search]
-  );
-
-  const featuredCount = useMemo(
-    () => rows.filter((r) => r.isFeatured).length,
-    [rows]
+    () => buildAggregatedNews(feeds, manualNews as any, { search }),
+    [feeds, manualNews, search]
   );
 
   const openCreate = () => { setEditingManual(null); setManualDrawerOpen(true); };
@@ -83,19 +72,24 @@ export default function News() {
     );
   }
 
+  const dateLabel = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+
   return (
-    <div className="space-y-3 animate-fade-up">
+    <div className="space-y-4 animate-fade-up">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Newspaper className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-semibold text-foreground">Notícias</h1>
-          <span className="text-xs text-muted-foreground">
-            {rows.length} {rows.length === 1 ? 'item' : 'itens'}
-            {featuredCount > 0 && ` · ${featuredCount} em destaque`}
-          </span>
+      <div className="flex flex-wrap items-end justify-between gap-3 pb-1 border-b border-border">
+        <div>
+          <h1
+            className="text-2xl font-bold text-foreground tracking-tight"
+            style={{ fontFamily: "'Libre Baskerville', Georgia, serif" }}
+          >
+            Notícias
+          </h1>
+          <p className="text-xs text-muted-foreground capitalize mt-0.5">{dateLabel}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pb-1">
           <div className="relative w-56">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -109,57 +103,15 @@ export default function News() {
             <>
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setThemeDrawerOpen(true)}>
                 <Tags className="h-3.5 w-3.5 mr-1.5" />
-                Temas e feeds
+                Feeds
               </Button>
               <Button size="sm" className="h-8 text-xs" onClick={openCreate}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Adicionar notícia
+                Adicionar
               </Button>
             </>
           )}
         </div>
-      </div>
-
-      {/* Theme filter chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-        <button
-          onClick={() => setTheme('all')}
-          className={cn(
-            'shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors',
-            theme === 'all'
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-accent'
-          )}
-        >
-          Todos
-        </button>
-        {getOrderedThemes(themeOverrides).map((tValue) => (
-          <button
-            key={tValue}
-            onClick={() => setTheme(tValue)}
-            className={cn(
-              'shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors',
-              theme === tValue
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-accent'
-            )}
-          >
-            {resolveLabel(tValue, themeOverrides)}
-          </button>
-        ))}
-        <div className="mx-1 h-4 w-px bg-border shrink-0" />
-        <button
-          onClick={() => setOnlyFeatured((v) => !v)}
-          className={cn(
-            'shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors flex items-center gap-1',
-            onlyFeatured
-              ? 'bg-primary/15 text-primary border-primary/40'
-              : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-accent'
-          )}
-        >
-          <Star className={cn('h-3 w-3', onlyFeatured && 'fill-primary')} />
-          Destaques
-        </button>
       </div>
 
       {/* Portal layout */}
