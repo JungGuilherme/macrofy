@@ -1,9 +1,7 @@
-// One-shot RSS curation (2026-07-15, agreed with the user):
-//  - deactivate noisy/duplicate feeds
-//  - replace mojibake feeds (Folha/UOL fetched as ISO-8859-1 by the edge
-//    function) with UTF-8 Google News per-site feeds
-//  - add InfoMoney Economia/Mercados (their official RSS ships no items)
-// Safe to re-run: every step is idempotent.
+// Declarative RSS curation (2026-07-15, v2 — agreed with the user):
+// the portal runs on exactly five feeds — InfoMoney (economia+mercados),
+// Valor (brasil+finanças) and Investing "Notícias Mais Lidas". Everything
+// else is deactivated (not deleted). Idempotent; safe to re-run anytime.
 //
 // Env: SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
 
@@ -15,6 +13,18 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
 
 const GN = (q) =>
   `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+
+/** The desired end state. `theme` (legacy single) powers old widgets. */
+const KEEP = [
+  { name: 'Investing — Mais Lidas', feed_url: 'https://br.investing.com/rss/news_285.rss', themes: [], theme: 'Mais Lidas' },
+  { name: 'InfoMoney Economia', feed_url: GN('site:infomoney.com.br/economia'), themes: ['macro'], theme: null },
+  { name: 'InfoMoney Mercados', feed_url: GN('site:infomoney.com.br/mercados'), themes: ['mercados'], theme: null },
+  { name: 'Valor — Brasil', feed_url: GN('site:valor.globo.com/brasil'), themes: ['macro'], theme: null },
+  { name: 'Valor — Finanças', feed_url: GN('site:valor.globo.com/financas'), themes: ['mercados'], theme: null },
+];
+
+// Rows that are infrastructure, not news feeds — never touch.
+const INFRA = ['YouTube · Alta Vista'];
 
 async function login() {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -39,76 +49,52 @@ function headers(token) {
 const token = await login();
 
 const feeds = await (
-  await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?select=id,name,themes,theme,feed_url,is_active,display_order`, {
+  await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?select=id,name,is_active,feed_url,display_order`, {
     headers: headers(token),
   })
 ).json();
 console.log(`Loaded ${feeds.length} feeds`);
 
-async function patch(id, body, label) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?id=eq.${id}`, {
-    method: 'PATCH', headers: headers(token), body: JSON.stringify(body),
+const keepNames = new Set(KEEP.map((k) => k.name));
+
+// 1 ── deactivate everything that isn't in the keep list
+for (const f of feeds) {
+  if (keepNames.has(f.name) || INFRA.includes(f.name) || f.is_active === false) continue;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?id=eq.${f.id}`, {
+    method: 'PATCH', headers: headers(token), body: JSON.stringify({ is_active: false }),
   });
-  console.log(`${res.ok ? '✓' : '✗'} ${label}${res.ok ? '' : ` (HTTP ${res.status})`}`);
+  console.log(`${res.ok ? '✓' : '✗'} desativar: ${f.name}`);
 }
 
-const hasTheme = (f, t) => (f.themes ?? []).includes(t) || f.theme === t;
-
-/* 1 ── deactivate noise ── */
-const toDeactivate = feeds.filter((f) =>
-  f.is_active !== false && (
-    f.name === 'Financial Juice' ||
-    f.name === 'Google' ||
-    f.name === 'Investing Ações' ||
-    (f.name === 'Investing.com' && hasTheme(f, 'empresas')) ||
-    (f.name === 'Investing' && hasTheme(f, 'politica'))
-  )
-);
-// duplicate Investing.com macro feeds: keep the first by display_order
-const macroDupes = feeds
-  .filter((f) => f.is_active !== false && f.name === 'Investing.com' && hasTheme(f, 'macro'))
-  .sort((a, b) => (a.display_order ?? 99) - (b.display_order ?? 99))
-  .slice(1);
-
-for (const f of [...toDeactivate, ...macroDupes]) {
-  await patch(f.id, { is_active: false }, `desativar: ${f.name} [${(f.themes ?? [f.theme]).join(',')}]`);
+// 2 ── ensure each keeper exists, is active and points at the right URL
+for (const [i, k] of KEEP.entries()) {
+  const existing = feeds.find((f) => f.name === k.name);
+  const body = {
+    name: k.name, feed_url: k.feed_url, themes: k.themes, theme: k.theme,
+    is_active: true, display_order: i + 1,
+  };
+  if (existing) {
+    // clear stored items when the URL changes so refresh repopulates cleanly
+    const changed = existing.feed_url !== k.feed_url;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds?id=eq.${existing.id}`, {
+      method: 'PATCH', headers: headers(token),
+      body: JSON.stringify(changed ? { ...body, items: [] } : body),
+    });
+    console.log(`${res.ok ? '✓' : '✗'} garantir: ${k.name}${changed ? ' (URL trocada, itens limpos)' : ''}`);
+  } else {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds`, {
+      method: 'POST', headers: headers(token),
+      body: JSON.stringify({ ...body, items: [] }),
+    });
+    console.log(`${res.ok ? '✓' : '✗'} criar: ${k.name}${res.ok ? '' : ` (HTTP ${res.status} ${await res.text()})`}`);
+  }
 }
 
-/* 2 ── replace mojibake sources with UTF-8 Google News equivalents ── */
-const replacements = [
-  { match: (f) => f.name === 'Folha de São Paulo', url: GN('site:folha.uol.com.br/mercado'), newName: 'Folha — Mercado' },
-  { match: (f) => f.name === 'Folha de SP', url: GN('site:folha.uol.com.br/poder'), newName: 'Folha — Poder' },
-  { match: (f) => f.name === 'UOL', url: GN('site:economia.uol.com.br'), newName: 'UOL Economia' },
-];
-for (const r of replacements) {
-  const f = feeds.find(r.match);
-  if (!f) { console.log(`— não encontrado: ${r.newName}`); continue; }
-  // items cleared so the next refresh repopulates without mojibake
-  await patch(f.id, { feed_url: r.url, name: r.newName, items: [] }, `substituir: ${f.name} → ${r.newName}`);
-}
-
-/* 3 ── add InfoMoney (economia + mercados only, per user request) ── */
-const additions = [
-  { name: 'InfoMoney Economia', feed_url: GN('site:infomoney.com.br/economia'), themes: ['macro'] },
-  { name: 'InfoMoney Mercados', feed_url: GN('site:infomoney.com.br/mercados'), themes: ['mercados'] },
-  { name: 'Valor — Brasil', feed_url: GN('site:valor.globo.com/brasil'), themes: ['macro'] },
-  { name: 'Valor — Finanças', feed_url: GN('site:valor.globo.com/financas'), themes: ['mercados'] },
-];
-const maxOrder = Math.max(0, ...feeds.map((f) => f.display_order ?? 0));
-for (const [i, a] of additions.entries()) {
-  if (feeds.some((f) => f.name === a.name)) { console.log(`— já existe: ${a.name}`); continue; }
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rss_feeds`, {
-    method: 'POST', headers: headers(token),
-    body: JSON.stringify({ ...a, items: [], is_active: true, display_order: maxOrder + i + 1 }),
-  });
-  console.log(`${res.ok ? '✓' : '✗'} adicionar: ${a.name}${res.ok ? '' : ` (HTTP ${res.status} ${await res.text()})`}`);
-}
-
-/* 4 ── refresh so the portal repopulates immediately ── */
+// 3 ── refresh so the portal repopulates immediately
 const refresh = await fetch(`${SUPABASE_URL}/functions/v1/refresh-rss`, {
   method: 'POST',
   headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   body: '{}',
 });
 console.log(`${refresh.ok ? '✓' : '✗'} refresh-rss disparado (HTTP ${refresh.status})`);
-console.log('Curadoria concluída.');
+console.log('Curadoria concluída — 5 feeds ativos.');

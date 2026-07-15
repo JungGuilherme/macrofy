@@ -216,6 +216,43 @@ function FeedCard({ row, adminProps }: { row: AggregatedNewsRow; adminProps: Omi
   );
 }
 
+/** Right rail: Investing's official "Mais Lidas" ranking. */
+function MaisLidasRail({ feeds }: { feeds: RssFeed[] }) {
+  const feed = feeds.find(
+    (f) => f.is_active !== false && (/mais lidas/i.test(f.name) || f.theme === 'Mais Lidas')
+  );
+  const items = (feed?.items ?? []).slice(0, 8);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <h3 className="text-sm font-semibold text-foreground mb-3">Mais Lidas</h3>
+      <ol className="space-y-2.5">
+        {items.map((item, i) => (
+          <li key={item.guid}>
+            <a
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-start gap-2.5"
+            >
+              <span
+                className="text-lg font-bold text-muted-foreground/40 leading-none w-5 text-right flex-shrink-0"
+                style={{ fontFamily: "'Roboto Mono', monospace" }}
+              >
+                {i + 1}
+              </span>
+              <span className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                {item.title}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** Right rail: the main RSS sources and their freshness. */
 function SourcesRail({ feeds }: { feeds: RssFeed[] }) {
   const active = feeds
@@ -301,6 +338,7 @@ export function NewsPortal({ rows, feeds, ...adminProps }: NewsPortalProps) {
           )}
         </div>
         <div className="space-y-4 lg:sticky lg:top-32">
+          <MaisLidasRail feeds={feeds} />
           <SourcesRail feeds={feeds} />
         </div>
       </div>
