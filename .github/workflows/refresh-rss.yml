@@ -16,6 +16,9 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Login as admin
         id: login
         run: |
@@ -48,3 +51,9 @@ jobs:
             echo "::error::refresh-rss returned HTTP $HTTP_STATUS"
             exit 1
           fi
+
+      # The edge function drops <enclosure> images (it only parses
+      # media:content); this pass re-reads direct feeds and backfills
+      # item images so the news hero has a cover photo.
+      - name: Enrich items with cover images
+        run: node scripts/enrich-rss-images.mjs
