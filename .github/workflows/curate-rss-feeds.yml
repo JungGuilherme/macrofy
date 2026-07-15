@@ -1,0 +1,22 @@
+name: Curate RSS Feeds
+
+# One-shot feed cleanup — run manually from the Actions tab.
+# Idempotent: re-running is harmless.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply curation
+        run: node scripts/curate-rss-feeds.mjs
