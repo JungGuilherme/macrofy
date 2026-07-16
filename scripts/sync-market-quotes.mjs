@@ -66,15 +66,19 @@ async function login() {
 
 async function fetchQuote(symbol, name) {
   try {
-    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+    // 5m intraday closes double as both the live quote and the sparkline
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; macrofy)' } });
     if (!res.ok) return null;
     const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
+    const result = data?.chart?.result?.[0];
+    const meta = result?.meta;
     if (!meta?.regularMarketPrice) return null;
     const price = meta.regularMarketPrice;
     const prev = meta.chartPreviousClose || meta.previousClose || price;
     const change = price - prev;
+    const closes = (result?.indicators?.quote?.[0]?.close ?? [])
+      .filter((v) => v !== null && v !== undefined);
     return {
       symbol,
       name,
@@ -83,6 +87,7 @@ async function fetchQuote(symbol, name) {
       change_percent: prev ? Number(((change / prev) * 100).toFixed(4)) : 0,
       currency: meta.currency || 'USD',
       updated_at: new Date().toISOString(),
+      sparkline: closes.slice(-48), // last ~4h at 5m resolution
     };
   } catch {
     return null;

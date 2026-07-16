@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS public.market_quotes (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Intraday closes for the card sparkline (added 2026-07). Safe to re-run.
+ALTER TABLE public.market_quotes ADD COLUMN IF NOT EXISTS sparkline numeric[] DEFAULT '{}';
+
 ALTER TABLE public.market_quotes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Authenticated can read market quotes" ON public.market_quotes;

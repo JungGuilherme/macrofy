@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts';
 
 interface Quote {
   symbol: string;
@@ -13,6 +15,22 @@ interface Quote {
   changePercent: number;
   currency?: string;
   updatedAt?: Date | null;
+  sparkline?: number[];
+}
+
+/** Normalize a raw price series into %-from-first-point, for the sparkline. */
+function normalizeSeries(values: number[] = []) {
+  const series = values.filter((v) => Number.isFinite(v));
+  if (series.length < 3) return { data: [] as { i: number; v: number }[], minY: -0.2, maxY: 0.2 };
+  const first = series[0] || 1;
+  const data = series.map((v, i) => ({ i, v: ((v / first) - 1) * 100 }));
+  const vals = data.map((d) => d.v);
+  let minY = Math.min(...vals);
+  let maxY = Math.max(...vals);
+  const pad = Math.max((maxY - minY) * 0.15, 0.02);
+  minY -= pad; maxY += pad;
+  if (maxY - minY < 0.1) { const mid = (maxY + minY) / 2; minY = mid - 0.05; maxY = mid + 0.05; }
+  return { data, minY, maxY };
 }
 
 /* CNBC-style category strip.
@@ -106,56 +124,70 @@ type ThemeName = 'light' | 'dark' | 'bloomberg';
 
 function QuoteCard({ q, entry, theme }: { q: Quote; entry: Entry; theme: ThemeName }) {
   const up = q.changePercent >= 0;
+  const color = up ? 'hsl(var(--success))' : 'hsl(var(--destructive))';
+  const { data: chartData, minY, maxY } = normalizeSeries(q.sparkline);
 
-  // Per-theme looks:
-  //  light     — solid green/red block, white text (CNBC style)
-  //  dark      — dark card, neutral text, colored arrow/variation
-  //  bloomberg — hollow box on black, yellow labels, colored numbers
   const box = cn(
-    'rounded-lg px-4 py-3 min-w-[185px] flex-1 shadow-sm',
-    theme === 'light' && (up ? 'bg-emerald-700 text-white' : 'bg-red-700 text-white'),
-    theme === 'dark' && 'bg-muted/40 border border-border text-foreground',
-    theme === 'bloomberg' && 'bg-black border border-yellow-400/40'
+    'rounded-xl px-4 py-3 min-w-[190px] flex-1 flex flex-col justify-between min-h-[112px]',
+    theme === 'bloomberg' ? 'bg-black border border-yellow-400/40' : 'bg-card border border-border'
   );
   const nameCls = cn(
-    'text-[11px] font-bold uppercase tracking-wide truncate',
-    theme === 'bloomberg' && 'text-yellow-400'
+    'text-[11px] font-medium uppercase tracking-wide truncate',
+    theme === 'bloomberg' ? 'text-yellow-400/80' : 'text-muted-foreground'
   );
   const priceCls = cn(
-    'text-[15px] font-bold tabular-nums whitespace-nowrap',
-    theme === 'bloomberg' && 'text-yellow-400'
+    'text-xl font-bold tabular-nums whitespace-nowrap',
+    theme === 'bloomberg' ? 'text-yellow-400' : 'text-foreground'
   );
-  const varColor =
-    theme === 'light'
-      ? 'text-white'
-      : up
-        ? 'text-emerald-500'
-        : 'text-red-500';
   const timeCls = cn(
-    'mt-1.5 text-[9px] uppercase tracking-wider',
-    theme === 'light' ? 'text-white/60' : theme === 'bloomberg' ? 'text-yellow-400/50' : 'text-muted-foreground'
+    'text-[10px] mt-1',
+    theme === 'bloomberg' ? 'text-yellow-400/40' : 'text-muted-foreground'
   );
 
   return (
     <div className={box}>
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-2 mb-1">
         <span className={nameCls}>{entry.name}</span>
-        <span className={priceCls} style={{ fontFamily: "'Roboto Mono', monospace" }}>
-          {entry.prefix ?? ''}{fmt(q.price, q.currency)}{entry.suffix ?? ''}
-        </span>
+        {up
+          ? <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" style={{ color }} />
+          : <TrendingDown className="h-3.5 w-3.5 flex-shrink-0" style={{ color }} />}
       </div>
-      <div className={cn('flex items-center justify-between mt-1.5', varColor)}>
-        <span className="text-sm leading-none">{up ? '▲' : '▼'}</span>
-        <span className="text-[12px] font-semibold tabular-nums" style={{ fontFamily: "'Roboto Mono', monospace" }}>
-          {up ? '+' : ''}{q.change.toFixed(2)}{'  '}
-          {up ? '+' : ''}{q.changePercent.toFixed(2)}%
-        </span>
-      </div>
-      {q.updatedAt && (
-        <div className={timeCls}>
-          Últ. atualização {q.updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex flex-col">
+          <span className={priceCls}>
+            {entry.prefix ?? ''}{fmt(q.price, q.currency)}{entry.suffix ?? ''}
+          </span>
+          <span className="text-sm font-semibold" style={{ color }}>
+            {up ? '+' : ''}{q.changePercent.toFixed(2)}%
+          </span>
         </div>
-      )}
+
+        {chartData.length > 2 && (
+          <div className="w-[90px] h-[42px] flex-shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <YAxis hide domain={[minY, maxY]} />
+                <defs>
+                  <linearGradient id={`grad-${entry.cache}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone" dataKey="v" stroke={color} strokeWidth={1.5}
+                  fill={`url(#grad-${entry.cache})`} dot={false} isAnimationActive={false} baseValue={minY}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      <div className={timeCls}>
+        Yahoo Finance
+        {q.updatedAt && ` · ${q.updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+      </div>
     </div>
   );
 }
@@ -180,6 +212,7 @@ export function HomeMarketsSection() {
         changePercent: Number(r.change_percent),
         currency: r.currency,
         updatedAt: r.updated_at ? new Date(r.updated_at) : null,
+        sparkline: Array.isArray(r.sparkline) ? r.sparkline.map(Number) : [],
       })) as Quote[];
     },
     // Actions refreshes the table ~every 5 min; re-read often so new rows
@@ -216,8 +249,9 @@ export function HomeMarketsSection() {
     return category.entries
       .map((entry) => {
         const live = entry.live ? liveQuotes.find((q) => q.symbol === entry.live) : undefined;
-        if (live) return { entry, q: { ...live, updatedAt: liveAt } };
         const cached = cacheQuotes.find((q) => q.symbol === entry.cache);
+        // market-ticker has no sparkline; borrow the cache's series for the chart.
+        if (live) return { entry, q: { ...live, updatedAt: liveAt, sparkline: cached?.sparkline } };
         if (cached) return { entry, q: cached };
         return null;
       })
@@ -251,7 +285,7 @@ export function HomeMarketsSection() {
       {loading ? (
         <div className="flex gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-[84px] flex-1 min-w-[185px] rounded-lg" />
+            <Skeleton key={i} className="h-[112px] flex-1 min-w-[190px] rounded-xl" />
           ))}
         </div>
       ) : cards.length === 0 ? (
