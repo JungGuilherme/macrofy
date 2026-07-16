@@ -207,10 +207,13 @@ function LoginCard() {
       >
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Entrar na plataforma'}
       </button>
-      <p className="text-[11px] text-zinc-500 text-center">
-        Não tem conta?{' '}
+      <p className="text-[11px] text-zinc-500 text-center flex items-center justify-center gap-3">
         <Link to="/login" className="text-blue-400 hover:text-blue-300">
           Criar acesso
+        </Link>
+        <span className="text-zinc-700">·</span>
+        <Link to="/login" className="text-blue-400 hover:text-blue-300">
+          Esqueci minha senha
         </Link>
       </p>
     </form>

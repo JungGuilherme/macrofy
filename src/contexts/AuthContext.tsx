@@ -17,9 +17,15 @@ interface AuthContextType {
   role: AppRole;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** True after the user opens a "reset password" email link — show the
+   *  set-new-password screen regardless of route until this clears. */
+  passwordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (password: string) => Promise<{ error: Error | null }>;
+  cancelPasswordRecovery: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole>('aai');
   const [isLoading, setIsLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   // Fetch user profile and role
   const fetchUserData = async (userId: string) => {
@@ -79,7 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setRole('aai');
         }
-        
+
+        // Clicking a "reset password" email link signs the user in with a
+        // temporary recovery session. Flag it so the app shows a
+        // set-new-password screen instead of the normal app.
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true);
+        }
+
         setIsLoading(false);
       }
     );
@@ -128,6 +142,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole('aai');
   };
 
+  const sendPasswordReset = async (email: string) => {
+    // No route in redirectTo: HashRouter's "#/path" would collide with the
+    // "#access_token=..." fragment Supabase appends. Landing on the bare
+    // origin is enough — the PASSWORD_RECOVERY event fires regardless of path.
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    return { error };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error };
+  };
+
+  const cancelPasswordRecovery = () => setPasswordRecovery(false);
+
   // Local-dev only: VITE_DEV_FAKE_AUTH=true in .env fakes an admin session so
   // layout work doesn't require credentials. Dead code in production builds
   // (import.meta.env.DEV is false); data stays behind RLS regardless.
@@ -142,9 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: devBypass ? 'admin' : role,
         isLoading: devBypass ? false : isLoading,
         isAuthenticated: devBypass || !!user,
+        passwordRecovery,
         signIn,
         signUp,
         signOut,
+        sendPasswordReset,
+        updatePassword,
+        cancelPasswordRecovery,
       }}
     >
       {children}

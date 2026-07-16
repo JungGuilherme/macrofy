@@ -14,6 +14,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
+import ResetPassword from "./pages/ResetPassword";
 
 // Lazily loaded: everything else downloads on first visit to the route
 const Recommendations = lazy(() => import("./pages/Recommendations"));
@@ -73,7 +74,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, passwordRecovery } = useAuth();
+
+  // A "reset password" email link signs the user in with a temporary
+  // recovery session (isAuthenticated becomes true) on a garbled hash that
+  // doesn't match any route. Intercept before normal routing so the user
+  // always sees the set-new-password screen instead of landing in the app.
+  if (passwordRecovery) {
+    return <ResetPassword />;
+  }
 
   return (
     <Routes>
