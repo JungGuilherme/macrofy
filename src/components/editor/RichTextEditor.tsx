@@ -1,15 +1,22 @@
-import { sanitizeHtml } from "@/lib/sanitize";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2, ImageIcon } from "lucide-react";
 import { useCallback } from "react";
+import { MacroChartNode } from "./MacroChartNode";
+import { InsertChartButton } from "./InsertChartButton";
+import { useHtmlWithEmbeds } from "@/components/reports/useHtmlWithEmbeds";
 
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   editable?: boolean;
+}
+
+function ReadOnlyHtml({ content }: { content: string }) {
+  const ref = useHtmlWithEmbeds(content);
+  return <div ref={ref} className="prose prose-sm sm:prose max-w-none" />;
 }
 
 export function RichTextEditor({ content, onChange, editable = true }: RichTextEditorProps) {
@@ -20,6 +27,7 @@ export function RichTextEditor({ content, onChange, editable = true }: RichTextE
         inline: true,
         allowBase64: true,
       }),
+      MacroChartNode,
     ],
     content,
     editable,
@@ -71,12 +79,7 @@ export function RichTextEditor({ content, onChange, editable = true }: RichTextE
   }
 
   if (!editable) {
-    return (
-      <div
-        className="prose prose-sm sm:prose max-w-none"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
-      />
-    );
+    return <ReadOnlyHtml content={content} />;
   }
 
   return (
@@ -134,6 +137,7 @@ export function RichTextEditor({ content, onChange, editable = true }: RichTextE
         <Button type="button" variant="ghost" size="sm" onClick={addImage}>
           <ImageIcon className="h-4 w-4" />
         </Button>
+        <InsertChartButton editor={editor} />
       </div>
       {/* Editor Content */}
       <EditorContent editor={editor} />

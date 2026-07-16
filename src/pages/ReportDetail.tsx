@@ -1,4 +1,4 @@
-import { sanitizeHtml } from "@/lib/sanitize";
+import { RichHtmlContent } from "@/components/reports/useHtmlWithEmbeds";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -192,9 +192,9 @@ export default function ReportDetail() {
 
             {/* Content - prefer content_html, fallback to summary */}
             {report.content_html ? (
-              <div 
+              <RichHtmlContent
+                html={report.content_html}
                 className="prose prose-lg max-w-none text-foreground rich-text-content"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(report.content_html) }}
               />
             ) : report.summary ? (
               <div className="prose prose-lg max-w-none">

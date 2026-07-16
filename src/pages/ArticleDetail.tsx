@@ -1,4 +1,4 @@
-import { sanitizeHtml } from "@/lib/sanitize";
+import { RichHtmlContent } from "@/components/reports/useHtmlWithEmbeds";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -150,9 +150,9 @@ export default function ArticleDetail() {
 
             {/* Body - prefer content_html, fallback to body */}
             {(article as any).content_html ? (
-              <div 
+              <RichHtmlContent
+                html={(article as any).content_html}
                 className="prose prose-lg max-w-none text-foreground rich-text-content"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml((article as any).content_html) }}
               />
             ) : article.body ? (
               <div className="prose prose-lg max-w-none">
