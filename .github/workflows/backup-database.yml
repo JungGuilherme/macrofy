@@ -1,9 +1,9 @@
 name: Backup Database
 
 on:
-  schedule:
-    # Sundays 09:00 UTC (06:00 Brasília) — weekly snapshot of all tables
-    - cron: '0 9 * * 0'
+  # PAUSED 2026-07-16 (Supabase auth rate-limit incident) — schedule:
+    # # Sundays 09:00 UTC (06:00 Brasília) — weekly snapshot of all tables
+    # - cron: '0 9 * * 0'
   workflow_dispatch:
 
 jobs:

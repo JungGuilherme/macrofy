@@ -1,11 +1,11 @@
 name: Sync Market Quotes
 
 on:
-  schedule:
-    # Every 5 minutes (GitHub's minimum; real cadence ~5–12 min under load).
-    # Yahoo's free international quotes are 15–20 min delayed at the source
-    # anyway; the live market-ticker overlay covers the main symbols at 60s.
-    - cron: '*/5 * * * *'
+  # PAUSED 2026-07-16 (Supabase auth rate-limit incident) — schedule:
+    # # Every 5 minutes (GitHub's minimum; real cadence ~5–12 min under load).
+    # # Yahoo's free international quotes are 15–20 min delayed at the source
+    # # anyway; the live market-ticker overlay covers the main symbols at 60s.
+    # - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

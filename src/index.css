@@ -460,3 +460,26 @@
     overflow: hidden;
   }
 }
+
+/* ── Print export (used by "Exportar PDF" on reports/articles) ──
+   Classic isolation trick: hide everything, then re-reveal only the
+   marked print area, absolutely positioned at the page origin so the
+   app's layout (sidebar, ticker, header) doesn't leave blank space. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

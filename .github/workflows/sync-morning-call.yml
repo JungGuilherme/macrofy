@@ -1,13 +1,13 @@
 name: Sync Morning Call
 
 on:
-  schedule:
-    # The channel opens the video link at ~07:55 Brasília (10:55 UTC).
-    # Extra attempts cover GitHub cron delays and late uploads; the
-    # script is idempotent, so re-runs are harmless.
-    - cron: '55 10 * * 1-5'
-    - cron: '15 11 * * 1-5'
-    - cron: '0 12 * * 1-5'
+  # PAUSED 2026-07-16 (Supabase auth rate-limit incident) — schedule:
+    # # The channel opens the video link at ~07:55 Brasília (10:55 UTC).
+    # # Extra attempts cover GitHub cron delays and late uploads; the
+    # # script is idempotent, so re-runs are harmless.
+    # - cron: '55 10 * * 1-5'
+    # - cron: '15 11 * * 1-5'
+    # - cron: '0 12 * * 1-5'
   workflow_dispatch:
 
 jobs:

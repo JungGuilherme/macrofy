@@ -1,10 +1,10 @@
 name: Refresh RSS Feeds
 
 on:
-  schedule:
-    # Every 30 minutes — keeps the news portal fresh through the day.
-    # (GitHub may delay scheduled runs by a few minutes under load.)
-    - cron: '*/30 * * * *'
+  # PAUSED 2026-07-16 (Supabase auth rate-limit incident) — schedule:
+    # # Every 30 minutes — keeps the news portal fresh through the day.
+    # # (GitHub may delay scheduled runs by a few minutes under load.)
+    # - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:

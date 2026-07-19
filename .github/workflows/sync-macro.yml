@@ -1,9 +1,9 @@
 name: Sync Macro Data
 
 on:
-  schedule:
-    # 10:00 UTC = 07:00 Brasília — daily refresh of macro data
-    - cron: '0 10 * * *'
+  # PAUSED 2026-07-16 (Supabase auth rate-limit incident) — schedule:
+    # # 10:00 UTC = 07:00 Brasília — daily refresh of macro data
+    # - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
       functions:
