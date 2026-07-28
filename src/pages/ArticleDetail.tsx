@@ -22,6 +22,7 @@ import {
   FileText,
   User,
   ExternalLink,
+  Printer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -96,6 +97,12 @@ export default function ArticleDetail() {
         ]}
         actions={
           <div className="flex gap-2">
+            {(article as any).content_html && (
+              <Button variant="outline" className="gap-2 no-print" onClick={() => window.print()}>
+                <Printer className="h-4 w-4" />
+                Exportar PDF
+              </Button>
+            )}
             {isAdmin && (
               <>
                 <Button variant="outline" className="gap-2" onClick={() => setFormOpen(true)}>
@@ -120,7 +127,13 @@ export default function ArticleDetail() {
         {/* Main Content */}
         <div className="lg:col-span-3 space-y-6">
           {/* Article Content */}
-          <article className="bg-card rounded-xl border p-8">
+          <article className="bg-card rounded-xl border p-8 print-area">
+            {/* Print-only title (PageHeader above is hidden while printing) */}
+            <div className="hidden print:block mb-6">
+              <h1 className="text-2xl font-bold text-foreground">{article.title}</h1>
+              {article.subtitle && <p className="text-muted-foreground">{article.subtitle}</p>}
+            </div>
+
             {/* Tags */}
             {article.tags && article.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">

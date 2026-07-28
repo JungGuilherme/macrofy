@@ -25,6 +25,7 @@ import {
   ExternalLink,
   Link as LinkIcon,
   Video,
+  Printer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -125,6 +126,16 @@ export default function ReportDetail() {
         ]}
         actions={
           <div className="flex gap-2">
+            {report.content_html && (
+              <Button
+                variant="outline"
+                className="gap-2 no-print"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" />
+                Exportar PDF
+              </Button>
+            )}
             {report.pdf_url && (
               <Button
                 variant="outline"
@@ -159,7 +170,13 @@ export default function ReportDetail() {
         {/* Main Content */}
         <div className="lg:col-span-3 space-y-6">
           {/* Report Content */}
-          <article className="bg-card rounded-xl border p-8">
+          <article className="bg-card rounded-xl border p-8 print-area">
+            {/* Print-only title (PageHeader above is hidden while printing) */}
+            <div className="hidden print:block mb-6">
+              <h1 className="text-2xl font-bold text-foreground">{report.title}</h1>
+              {report.subtitle && <p className="text-muted-foreground">{report.subtitle}</p>}
+            </div>
+
             {/* Tags */}
             <div className="flex flex-wrap gap-2 mb-6">
               <span className={cn('chip', typeColors[report.type || 'relatorio'])}>
