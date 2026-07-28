@@ -1,4 +1,5 @@
 import { RichHtmlContent } from "@/components/reports/useHtmlWithEmbeds";
+import { RawHtmlDocument, isFullHtmlDocument } from "@/components/reports/RawHtmlDocument";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -161,8 +162,10 @@ export default function ArticleDetail() {
               <span>{new Date(article.created_at).toLocaleDateString('pt-BR')}</span>
             </div>
 
-            {/* Body - prefer content_html, fallback to body */}
-            {(article as any).content_html ? (
+            {/* Body - full standalone HTML doc, then rich-text content_html, then body */}
+            {isFullHtmlDocument((article as any).content_html) ? (
+              <RawHtmlDocument html={(article as any).content_html} className="-mx-8 -mb-8" />
+            ) : (article as any).content_html ? (
               <RichHtmlContent
                 html={(article as any).content_html}
                 className="prose prose-lg max-w-none text-foreground rich-text-content"

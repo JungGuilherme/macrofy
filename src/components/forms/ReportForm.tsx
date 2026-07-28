@@ -25,10 +25,13 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText, ExternalLink, Plus, X, Upload } from 'lucide-react';
+import { Loader2, FileText, ExternalLink, Plus, X, Upload, Code, PenLine } from 'lucide-react';
 import { Report } from '@/hooks/useReports';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { PdfUpload } from '@/components/common/PdfUpload';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { isFullHtmlDocument } from '@/components/reports/RawHtmlDocument';
 
 interface MaterialItem {
   label: string;
@@ -86,6 +89,7 @@ export function ReportForm({
 }: ReportFormProps) {
   const [tagsInput, setTagsInput] = useState('');
   const [contentHtml, setContentHtml] = useState('');
+  const [contentMode, setContentMode] = useState<'rich' | 'raw'>('rich');
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
 
   const form = useForm<FormData>({
@@ -123,6 +127,7 @@ export function ReportForm({
       });
       setTagsInput((report.tags || []).join(', '));
       setContentHtml(rep.content_html || '');
+      setContentMode(isFullHtmlDocument(rep.content_html) ? 'raw' : 'rich');
       setMaterials(Array.isArray(rep.materials) ? rep.materials : []);
     } else {
       form.reset({
@@ -140,9 +145,19 @@ export function ReportForm({
       });
       setTagsInput('');
       setContentHtml('');
+      setContentMode('rich');
       setMaterials([]);
     }
   }, [report, form, open]);
+
+  const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setContentHtml(String(reader.result || ''));
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
+  };
 
   const handleSubmit = async (data: FormData) => {
     const tags = tagsInput
@@ -291,14 +306,65 @@ export function ReportForm({
               )}
             />
 
-            {/* Rich Text Editor for content */}
+            {/* Content: rich-text editor or a full standalone HTML document */}
             <div className="space-y-2">
-              <FormLabel>Conteúdo</FormLabel>
-              <RichTextEditor
-                content={contentHtml}
-                onChange={setContentHtml}
-                editable={true}
-              />
+              <div className="flex items-center justify-between">
+                <FormLabel>Conteúdo</FormLabel>
+                <div className="flex rounded-md border border-border overflow-hidden text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setContentMode('rich')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 transition-colors',
+                      contentMode === 'rich' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
+                    )}
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    Editor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContentMode('raw')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 transition-colors border-l border-border',
+                      contentMode === 'raw' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
+                    )}
+                  >
+                    <Code className="h-3.5 w-3.5" />
+                    HTML completo
+                  </button>
+                </div>
+              </div>
+
+              {contentMode === 'rich' ? (
+                <RichTextEditor
+                  content={contentHtml}
+                  onChange={setContentHtml}
+                  editable={true}
+                />
+              ) : (
+                <div className="space-y-2 rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Cole aqui um documento HTML completo (com &lt;style&gt; e &lt;script&gt; próprios —
+                    ex: relatórios com gráficos Chart.js) ou carregue o arquivo .html direto.
+                    Ele é exibido com fidelidade total, dentro de uma área isolada.
+                  </p>
+                  <div>
+                    <input
+                      type="file"
+                      accept=".html,.htm,text/html"
+                      onChange={handleHtmlFileUpload}
+                      className="text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-primary-foreground file:text-xs hover:file:bg-primary/90"
+                    />
+                  </div>
+                  <Textarea
+                    value={contentHtml}
+                    onChange={(e) => setContentHtml(e.target.value)}
+                    placeholder="<!DOCTYPE html>..."
+                    className="font-mono text-xs min-h-[240px]"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

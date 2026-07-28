@@ -1,4 +1,5 @@
 import { RichHtmlContent } from "@/components/reports/useHtmlWithEmbeds";
+import { RawHtmlDocument, isFullHtmlDocument } from "@/components/reports/RawHtmlDocument";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -207,8 +208,10 @@ export default function ReportDetail() {
               </div>
             </div>
 
-            {/* Content - prefer content_html, fallback to summary */}
-            {report.content_html ? (
+            {/* Content - full standalone HTML doc, then rich-text content_html, then summary */}
+            {isFullHtmlDocument(report.content_html) ? (
+              <RawHtmlDocument html={report.content_html!} className="-mx-8 -mb-8" />
+            ) : report.content_html ? (
               <RichHtmlContent
                 html={report.content_html}
                 className="prose prose-lg max-w-none text-foreground rich-text-content"

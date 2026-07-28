@@ -13,5 +13,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // PKCE (supabase-js's default) requires the reset-password link to be
+    // opened in the same browser/device that requested it — a common way
+    // for "click reset, nothing happens" to occur (email opened elsewhere).
+    // Implicit flow embeds the session directly in the link's URL fragment,
+    // so it works regardless of device; that's also the format AuthContext's
+    // PASSWORD_RECOVERY detection was built around.
+    flowType: 'implicit',
   }
 });
