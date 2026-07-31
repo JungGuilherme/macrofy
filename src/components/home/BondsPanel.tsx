@@ -17,8 +17,11 @@ interface BondRow {
 
 /* ── shared table ── */
 
-function BondsTable({ title, rows, loading, note, updatedAt }: {
+type VarMode = 'bps' | 'pct';
+
+function BondsTable({ title, rows, loading, note, updatedAt, varMode, onVarModeChange }: {
   title: string; rows: BondRow[]; loading: boolean; note?: string; updatedAt?: Date | null;
+  varMode: VarMode; onVarModeChange: (mode: VarMode) => void;
 }) {
   return (
     <div className="bg-card rounded-xl border p-4">
@@ -27,11 +30,30 @@ function BondsTable({ title, rows, loading, note, updatedAt }: {
           <Landmark className="h-4 w-4 text-primary flex-shrink-0" />
           <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide truncate">{title}</h3>
         </div>
-        {updatedAt && (
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0" style={MONO}>
-            atualizado {updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center rounded-md border border-border overflow-hidden">
+            {(['bps', 'pct'] as VarMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => onVarModeChange(m)}
+                className={cn(
+                  'px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors',
+                  varMode === m
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {m === 'bps' ? 'bps' : 'var %'}
+              </button>
+            ))}
+          </div>
+          {updatedAt && (
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider whitespace-nowrap" style={MONO}>
+              {updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
+        </div>
       </div>
       {loading ? (
         <div className="space-y-2 py-1">
@@ -45,8 +67,7 @@ function BondsTable({ title, rows, loading, note, updatedAt }: {
             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="text-left font-medium pb-1.5">Nome</th>
               <th className="text-right font-medium pb-1.5">Taxa</th>
-              <th className="text-right font-medium pb-1.5">Var. p.p.</th>
-              <th className="text-right font-medium pb-1.5">Var. %</th>
+              <th className="text-right font-medium pb-1.5">{varMode === 'bps' ? 'Var. bps' : 'Var. %'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -54,6 +75,7 @@ function BondsTable({ title, rows, loading, note, updatedAt }: {
               const up = (r.chg ?? 0) >= 0;
               const prevYield = r.chg !== null ? r.yield_ - r.chg : null;
               const chgPct = r.chg !== null && prevYield ? (r.chg / prevYield) * 100 : null;
+              const chgBps = r.chg !== null ? r.chg * 100 : null;
               const varCls = cn(
                 'py-1.5 text-right tabular-nums text-[13px] font-semibold',
                 r.chg === null ? 'text-muted-foreground' : up ? 'text-emerald-500' : 'text-red-500'
@@ -65,10 +87,9 @@ function BondsTable({ title, rows, loading, note, updatedAt }: {
                     {r.yield_.toFixed(3).replace('.', ',')}
                   </td>
                   <td className={varCls} style={MONO}>
-                    {r.chg === null ? '—' : `${up ? '+' : ''}${r.chg.toFixed(3).replace('.', ',')}`}
-                  </td>
-                  <td className={varCls} style={MONO}>
-                    {chgPct === null ? '—' : (
+                    {varMode === 'bps' ? (
+                      chgBps === null ? '—' : `${up ? '+' : ''}${chgBps.toFixed(0)} bps`
+                    ) : chgPct === null ? '—' : (
                       <>
                         {up ? '+' : ''}{chgPct.toFixed(2).replace('.', ',')}%{' '}
                         <span className="text-xs">{up ? '▲' : '▼'}</span>
@@ -312,6 +333,7 @@ interface BondsPanelProps {
 export function BondsPanel({ show = 'both', stacked = false }: BondsPanelProps) {
   const us = useUsTreasuries();
   const br = useBrCurve();
+  const [varMode, setVarMode] = useState<VarMode>('bps');
 
   const usRows = us.data?.rows ?? [];
   const showBr = show !== 'us';
@@ -328,6 +350,8 @@ export function BondsPanel({ show = 'both', stacked = false }: BondsPanelProps) 
       rows={br.rows}
       loading={br.loading}
       updatedAt={br.updatedAt}
+      varMode={varMode}
+      onVarModeChange={setVarMode}
       note={
         br.source === 'b3'
           ? 'Futuros DI1 — B3 (delay ~15 min) · variação vs. ajuste anterior'
@@ -341,6 +365,8 @@ export function BondsPanel({ show = 'both', stacked = false }: BondsPanelProps) 
       rows={usRows}
       loading={us.isLoading}
       updatedAt={us.data?.at ?? null}
+      varMode={varMode}
+      onVarModeChange={setVarMode}
       note={
         us.data?.source === 'cnbc'
           ? 'CNBC/Tradeweb (tempo real) · variação do dia'
