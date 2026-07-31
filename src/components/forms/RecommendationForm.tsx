@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { PdfUpload } from '@/components/common/PdfUpload';
 import { Loader2, FileText, ExternalLink } from 'lucide-react';
 import { Recommendation } from '@/hooks/useRecommendations';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
@@ -298,49 +299,48 @@ export function RecommendationForm({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="file_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Link do PDF
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="https://exemplo.com/documento.pdf"
-                        {...field}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="file_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    PDF
+                  </FormLabel>
+                  <FormControl>
+                    <PdfUpload
+                      currentUrl={field.value || null}
+                      folder="recommendations"
+                      onUploaded={(url) => field.onChange(url)}
+                      onRemoved={() => field.onChange(null)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="external_link"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <ExternalLink className="h-4 w-4" />
-                      Link Externo
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="https://exemplo.com/pagina"
-                        {...field}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="external_link"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Link Externo
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="https://exemplo.com/pagina"
+                      {...field}
+                      value={field.value || ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex justify-end gap-3 pt-4">
               <Button
