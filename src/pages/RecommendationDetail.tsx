@@ -182,32 +182,6 @@ export default function RecommendationDetail() {
               Publicado em {new Date(rec.created_at).toLocaleDateString('pt-BR')} •
               Atualizado em {new Date(rec.updated_at).toLocaleDateString('pt-BR')}
             </p>
-
-            {/* PDF and External Link */}
-            {((rec as any).file_url || (rec as any).external_link) && (
-              <div className="mt-4 pt-4 border-t border-border flex gap-2">
-                {(rec as any).file_url && (
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => window.open((rec as any).file_url, '_blank')}
-                  >
-                    <FileText className="h-4 w-4 text-primary" />
-                    Ver PDF
-                  </Button>
-                )}
-                {(rec as any).external_link && (
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => window.open((rec as any).external_link, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4 text-primary" />
-                    Abrir Link
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Content HTML */}
@@ -272,29 +246,55 @@ export default function RecommendationDetail() {
           {/* Materials */}
           <div className="bg-card rounded-xl border p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">Materiais</h2>
-            {materials.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {materials.map((material) => (
-                  <a
-                    key={material.id}
-                    href={material.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  >
-                    {material.type === 'pdf' && <FileText className="h-8 w-8 text-primary" />}
-                    {material.type === 'onepager' && <FileText className="h-8 w-8 text-gold" />}
-                    {material.type === 'link' && <ExternalLink className="h-8 w-8 text-muted-foreground" />}
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{material.label}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{material.type}</p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">Nenhum material disponível</p>
-            )}
+            {(() => {
+              const extra: { key: string; url: string; label: string; type: 'pdf' | 'link' }[] = [];
+              if ((rec as any).file_url) {
+                extra.push({ key: 'file_url', url: (rec as any).file_url, label: 'PDF', type: 'pdf' });
+              }
+              if ((rec as any).external_link) {
+                extra.push({ key: 'external_link', url: (rec as any).external_link, label: 'Link Externo', type: 'link' });
+              }
+              const allEmpty = materials.length === 0 && extra.length === 0;
+              return allEmpty ? (
+                <p className="text-muted-foreground text-sm">Nenhum material disponível</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {extra.map((item) => (
+                    <a
+                      key={item.key}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
+                    >
+                      {item.type === 'pdf' && <FileText className="h-8 w-8 text-primary" />}
+                      {item.type === 'link' && <ExternalLink className="h-8 w-8 text-muted-foreground" />}
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{item.label}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{item.type}</p>
+                      </div>
+                    </a>
+                  ))}
+                  {materials.map((material) => (
+                    <a
+                      key={material.id}
+                      href={material.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
+                    >
+                      {material.type === 'pdf' && <FileText className="h-8 w-8 text-primary" />}
+                      {material.type === 'onepager' && <FileText className="h-8 w-8 text-gold" />}
+                      {material.type === 'link' && <ExternalLink className="h-8 w-8 text-muted-foreground" />}
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{material.label}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{material.type}</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* History */}
