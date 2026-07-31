@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Apply migration
         run: node scripts/run-sql-migration.mjs "${{ github.event.inputs.file }}"
