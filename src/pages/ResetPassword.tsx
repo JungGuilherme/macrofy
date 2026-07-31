@@ -25,8 +25,8 @@ export default function ResetPassword() {
       toast.error('As senhas não coincidem');
       return;
     }
-    if (password.length < 6) {
-      toast.error('A senha deve ter ao menos 6 caracteres');
+    if (password.length < 8) {
+      toast.error('A senha deve ter ao menos 8 caracteres');
       return;
     }
     setIsLoading(true);
@@ -57,8 +57,9 @@ export default function ResetPassword() {
               <Input
                 id="new-password" type="password" placeholder="••••••••"
                 value={password} onChange={(e) => setPassword(e.target.value)}
-                required minLength={6} disabled={isLoading}
+                required minLength={8} disabled={isLoading}
               />
+              <p className="text-xs text-muted-foreground">Mínimo 8 caracteres. Evite senhas óbvias ou já usadas em outros sites.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmar senha</Label>

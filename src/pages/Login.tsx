@@ -115,7 +115,9 @@ export default function Login() {
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4 mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Digite seu email para receber um link de redefinição de senha.
+                    Digite seu email para receber um link de redefinição de senha. Se não aparecer em
+                    poucos minutos, confira o spam/lixo eletrônico — alguns provedores classificam
+                    esse tipo de email incorretamente.
                   </p>
                   <div className="space-y-2">
                     <Label htmlFor="forgot-email">Email</Label>
@@ -147,7 +149,7 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
-                  <Input id="signup-password" type="password" placeholder="Mínimo 6 caracteres" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required minLength={6} disabled={isLoading} />
+                  <Input id="signup-password" type="password" placeholder="Mínimo 8 caracteres" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required minLength={8} disabled={isLoading} />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando conta...</>) : 'Criar Conta'}
