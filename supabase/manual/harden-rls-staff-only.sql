@@ -88,11 +88,16 @@ BEGIN
     'ranking_assets', 'ranking_returns', 'strategic_wallets'
   ]
   LOOP
-    PERFORM public._drop_select_policies(t);
-    EXECUTE format(
-      'CREATE POLICY "Staff can view %I" ON public.%I FOR SELECT TO authenticated USING (public.is_staff(auth.uid()))',
-      t, t
-    );
+    -- Skip tables that don't exist yet (e.g. ranking_assets/ranking_returns,
+    -- still pending a separate manual SQL step) instead of failing the
+    -- whole migration.
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN
+      PERFORM public._drop_select_policies(t);
+      EXECUTE format(
+        'CREATE POLICY "Staff can view %I" ON public.%I FOR SELECT TO authenticated USING (public.is_staff(auth.uid()))',
+        t, t
+      );
+    END IF;
   END LOOP;
 END $$;
 
