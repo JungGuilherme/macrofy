@@ -21,6 +21,7 @@ import {
   Vote,
   Menu,
   Grid3X3,
+  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -192,6 +193,12 @@ function SidebarNav({ collapsed }: { collapsed: boolean }) {
           to="/artigos"
           icon={<BookOpen className="h-5 w-5" />}
           label="Artigos"
+          collapsed={collapsed}
+        />
+        <NavItem
+          to="/carteiras-recomendadas"
+          icon={<Briefcase className="h-5 w-5" />}
+          label="Carteiras recomendadas"
           collapsed={collapsed}
         />
 

@@ -1,0 +1,29 @@
+name: Run SQL Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'Path to the .sql file (relative to repo root)'
+        required: true
+        default: 'supabase/manual/strategic-wallets.sql'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Apply migration
+        run: node scripts/run-sql-migration.mjs "${{ github.event.inputs.file }}"

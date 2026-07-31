@@ -39,6 +39,7 @@ const Brasil = lazy(() => import("./pages/Brasil"));
 const EUA = lazy(() => import("./pages/EUA"));
 const Eleicoes2026 = lazy(() => import("./pages/Eleicoes2026"));
 const RankingAtivos = lazy(() => import("./pages/RankingAtivos"));
+const CarteirasRecomendadas = lazy(() => import("./pages/CarteirasRecomendadas"));
 
 function RouteFallback() {
   return (
@@ -122,6 +123,7 @@ function AppRoutes() {
                 <Route path="/relatorios/:id" element={<ReportDetail />} />
                 <Route path="/artigos" element={<Articles />} />
                 <Route path="/artigos/:id" element={<ArticleDetail />} />
+                <Route path="/carteiras-recomendadas" element={<CarteirasRecomendadas />} />
                 <Route path="/projecoes" element={<Projections />} />
                 <Route path="/videos" element={<Videos />} />
                 <Route path="/favoritos" element={<Favorites />} />
