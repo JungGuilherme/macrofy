@@ -143,10 +143,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const sendPasswordReset = async (email: string) => {
-    // No route in redirectTo: HashRouter's "#/path" would collide with the
-    // "#access_token=..." fragment Supabase appends. Landing on the bare
-    // origin is enough — the PASSWORD_RECOVERY event fires regardless of path.
-    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    // Hard-coded to the real production domain — NOT window.location.origin.
+    // Using the current origin meant a reset requested from a stale/parked
+    // deployment (e.g. the old macrofypro.lovable.app) would send the user
+    // back to that stale site instead of the real one. This is the one
+    // canonical place the link should ever point to, regardless of where
+    // the request was made from.
+    const redirectTo = 'https://macrofypro.com';
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     return { error };
   };
