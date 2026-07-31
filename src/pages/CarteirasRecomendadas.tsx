@@ -1,20 +1,24 @@
+import { useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { PdfUpload } from '@/components/common/PdfUpload';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useStrategicWallets,
   useUpdateWalletPdf,
+  useUpdateWalletLabel,
   type StrategicWallet,
   type WalletCategory,
 } from '@/hooks/useStrategicWallets';
-import { Briefcase, Download, FileText, Loader2 } from 'lucide-react';
+import { Briefcase, Download, FileText, Loader2, Pencil, Check, X } from 'lucide-react';
 
 const SECTIONS: { category: WalletCategory; title: string }[] = [
   { category: 'materiais_estrategicos', title: 'Materiais estratégicos' },
   { category: 'asset_allocation', title: 'Asset allocation' },
   { category: 'carteiras_offshore', title: 'Carteiras de Fundos Offshore' },
   { category: 'carteiras_previdencia', title: 'Carteiras de Previdência' },
+  { category: 'laminas', title: 'Lâminas' },
 ];
 
 function fmtDate(iso: string) {
@@ -23,14 +27,57 @@ function fmtDate(iso: string) {
 
 function WalletCard({ wallet, isAdmin }: { wallet: StrategicWallet; isAdmin: boolean }) {
   const updatePdf = useUpdateWalletPdf();
+  const updateLabel = useUpdateWalletLabel();
+  const [editing, setEditing] = useState(false);
+  const [labelDraft, setLabelDraft] = useState(wallet.label);
+
+  const saveLabel = () => {
+    const trimmed = labelDraft.trim();
+    if (trimmed && trimmed !== wallet.label) {
+      updateLabel.mutate({ id: wallet.id, label: trimmed });
+    }
+    setEditing(false);
+  };
 
   return (
     <div className="content-card p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-          <span className="font-medium text-foreground">{wallet.label}</span>
-        </div>
+        {editing ? (
+          <div className="flex items-center gap-1 flex-1">
+            <Input
+              autoFocus
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveLabel();
+                if (e.key === 'Escape') { setLabelDraft(wallet.label); setEditing(false); }
+              }}
+              className="h-8"
+            />
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={saveLabel}>
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => { setLabelDraft(wallet.label); setEditing(false); }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+            <span className="font-medium text-foreground">{wallet.label}</span>
+          </div>
+        )}
+        {isAdmin && !editing && (
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(true)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
 
       {wallet.pdf_url && (

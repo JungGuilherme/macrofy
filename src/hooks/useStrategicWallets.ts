@@ -6,7 +6,8 @@ export type WalletCategory =
   | 'materiais_estrategicos'
   | 'asset_allocation'
   | 'carteiras_offshore'
-  | 'carteiras_previdencia';
+  | 'carteiras_previdencia'
+  | 'laminas';
 
 export interface StrategicWallet {
   id: string;
@@ -36,6 +37,24 @@ export function useStrategicWallets() {
       }
       return { setupNeeded: false, wallets: (res.data ?? []) as StrategicWallet[] };
     },
+  });
+}
+
+export function useUpdateWalletLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, label }: { id: string; label: string }) => {
+      const { error } = await (supabase as any)
+        .from('strategic_wallets')
+        .update({ label })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['strategic-wallets'] });
+      toast.success('Nome atualizado');
+    },
+    onError: (e: Error) => toast.error('Erro ao renomear', { description: e.message }),
   });
 }
 
