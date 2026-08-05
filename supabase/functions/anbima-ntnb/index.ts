@@ -5,7 +5,10 @@
 // maturity. Interpolation mode is selectable via ?interp=linear|flat-forward.
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const MONTHS_EN = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+// ANBIMA's URL scheme uses Portuguese month abbreviations (e.g. "ago", not
+// "aug") — most months happen to match the English ones (jan/mar/jun/jul/nov),
+// which is why this silently worked until the month rolled to August.
+const MONTHS_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const BASE = 'https://www.anbima.com.br/informacoes/merc-sec/resultados';
 
 type Papel = 'ntn-b' | 'ltn' | 'ntn-f';
@@ -27,7 +30,7 @@ interface DayData {
 
 function dateToAnbima(d: Date): string {
   const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${dd}${MONTHS_EN[d.getUTCMonth()]}${d.getUTCFullYear()}`;
+  return `${dd}${MONTHS_PT[d.getUTCMonth()]}${d.getUTCFullYear()}`;
 }
 
 function isoDate(d: Date): string {
