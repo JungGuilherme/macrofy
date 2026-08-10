@@ -64,34 +64,48 @@ async function login() {
   return data.access_token;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchQuoteOnce(symbol, name) {
+  // 5m intraday closes double as both the live quote and the sparkline
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; macrofy)' } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!meta?.regularMarketPrice) return null;
+  const price = meta.regularMarketPrice;
+  const prev = meta.chartPreviousClose || meta.previousClose || price;
+  const change = price - prev;
+  const closes = (result?.indicators?.quote?.[0]?.close ?? [])
+    .filter((v) => v !== null && v !== undefined);
+  return {
+    symbol,
+    name,
+    price,
+    change: Number(change.toFixed(4)),
+    change_percent: prev ? Number(((change / prev) * 100).toFixed(4)) : 0,
+    currency: meta.currency || 'USD',
+    updated_at: new Date().toISOString(),
+    sparkline: closes.slice(-48), // last ~4h at 5m resolution
+  };
+}
+
+// Yahoo's unofficial endpoint occasionally rate-limits/blocks shared CI
+// runner IPs for a single request — one retry after a short delay clears
+// most of these transient blocks without meaningfully slowing the job down.
 async function fetchQuote(symbol, name) {
-  try {
-    // 5m intraday closes double as both the live quote and the sparkline
-    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; macrofy)' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result = data?.chart?.result?.[0];
-    const meta = result?.meta;
-    if (!meta?.regularMarketPrice) return null;
-    const price = meta.regularMarketPrice;
-    const prev = meta.chartPreviousClose || meta.previousClose || price;
-    const change = price - prev;
-    const closes = (result?.indicators?.quote?.[0]?.close ?? [])
-      .filter((v) => v !== null && v !== undefined);
-    return {
-      symbol,
-      name,
-      price,
-      change: Number(change.toFixed(4)),
-      change_percent: prev ? Number(((change / prev) * 100).toFixed(4)) : 0,
-      currency: meta.currency || 'USD',
-      updated_at: new Date().toISOString(),
-      sparkline: closes.slice(-48), // last ~4h at 5m resolution
-    };
-  } catch {
-    return null;
+  for (const attempt of [0, 1]) {
+    try {
+      const quote = await fetchQuoteOnce(symbol, name);
+      if (quote) return quote;
+    } catch {
+      // fall through to retry
+    }
+    if (attempt === 0) await sleep(800);
   }
+  return null;
 }
 
 const quotes = (
@@ -102,8 +116,12 @@ const failed = Object.keys(SYMBOLS).filter((s) => !quotes.some((q) => q.symbol =
 console.log(`Fetched ${quotes.length}/${Object.keys(SYMBOLS).length}` +
   (failed.length ? ` (failed: ${failed.join(', ')})` : ''));
 
-if (quotes.length === 0) {
-  console.error('No quotes fetched');
+// Only hard-fail (and trigger a GitHub Actions failure email) when Yahoo is
+// clearly down/blocking wholesale, not for the ordinary handful of symbols
+// that miss a single 5-minute cycle.
+const MIN_QUOTES = Math.ceil(Object.keys(SYMBOLS).length * 0.3);
+if (quotes.length < MIN_QUOTES) {
+  console.error(`Only ${quotes.length}/${Object.keys(SYMBOLS).length} quotes fetched (min ${MIN_QUOTES}) — treating as an outage`);
   process.exit(1);
 }
 
