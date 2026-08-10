@@ -68,7 +68,7 @@ jobs:
             # sync-macro-global is NOT called as an edge function: it times out
             # (504) fetching ~85 World Bank series. Its work is done by the
             # "Sync global snapshot" step below instead.
-            echo "functions=sync-macro-bcb,sync-macro-fred" >> $GITHUB_OUTPUT
+            echo "functions=sync-macro-bcb,sync-macro-fred,sync-macro-cycle" >> $GITHUB_OUTPUT
           else
             echo "functions=$INPUT" >> $GITHUB_OUTPUT
           fi

@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.anbima-ntnb]
 verify_jwt = false
+
+[functions.sync-macro-cycle]
+verify_jwt = false
