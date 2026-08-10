@@ -11,6 +11,7 @@ import BrazilValuationSection from "@/components/markets/BrazilValuationSection"
 import B3FlowsSection from "@/components/macro/B3FlowsSection";
 
 import CountryMacroPanel from "@/components/macro/CountryMacroPanel";
+import CiclosMacroSection from "@/components/macro/CiclosMacroSection";
 
 import BrazilCurvePanel from "@/components/curves/BrazilCurvePanel";
 import SentimentIndexSection from "@/components/sentiment/SentimentIndexSection";
@@ -116,6 +117,7 @@ export default function Brasil() {
 
         {/* MACRO */}
         <TabsContent value="macro" className="space-y-4 mt-4">
+          <CiclosMacroSection />
           <CountryMacroPanel country="BR" />
         </TabsContent>
 

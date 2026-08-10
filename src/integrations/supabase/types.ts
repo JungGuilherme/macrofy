@@ -729,6 +729,42 @@ export type Database = {
         }
         Relationships: []
       }
+      macro_cycle_history: {
+        Row: {
+          computed_at: string | null
+          country: string
+          date: string
+          growth_composite: number | null
+          growth_series_count: number | null
+          id: string
+          inflacao_implicita_1a: number | null
+          inflacao_vertice: string | null
+          quadrante: string | null
+        }
+        Insert: {
+          computed_at?: string | null
+          country?: string
+          date: string
+          growth_composite?: number | null
+          growth_series_count?: number | null
+          id?: string
+          inflacao_implicita_1a?: number | null
+          inflacao_vertice?: string | null
+          quadrante?: string | null
+        }
+        Update: {
+          computed_at?: string | null
+          country?: string
+          date?: string
+          growth_composite?: number | null
+          growth_series_count?: number | null
+          id?: string
+          inflacao_implicita_1a?: number | null
+          inflacao_vertice?: string | null
+          quadrante?: string | null
+        }
+        Relationships: []
+      }
       macro_heatmap_data: {
         Row: {
           calc_mode: string | null
