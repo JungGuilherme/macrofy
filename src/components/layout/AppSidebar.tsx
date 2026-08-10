@@ -169,8 +169,8 @@ function SidebarNav({ collapsed }: { collapsed: boolean }) {
 
         <SectionLabel collapsed={collapsed}>Mercados & Macro</SectionLabel>
         <NavItem to="/mercados" icon={<BarChart2 className="h-5 w-5" />} label="Mercados" collapsed={collapsed} />
-        <NavItem to="/brasil" icon={<Flag className="h-5 w-5" />} label="🇧🇷 Brasil" collapsed={collapsed} />
-        <NavItem to="/eua" icon={<Flag className="h-5 w-5" />} label="🇺🇸 Estados Unidos" collapsed={collapsed} />
+        <NavItem to="/brasil" icon={<Flag className="h-5 w-5" />} label="Brasil" collapsed={collapsed} />
+        <NavItem to="/eua" icon={<Flag className="h-5 w-5" />} label="Estados Unidos" collapsed={collapsed} />
         <NavItem to="/macro" icon={<LayoutDashboard className="h-5 w-5" />} label="Visão Global" collapsed={collapsed} />
         <NavItem to="/tesouro-curvas" icon={<LineChart className="h-5 w-5" />} label="Curvas de Juros" collapsed={collapsed} />
         <NavItem to="/ranking-ativos" icon={<Grid3X3 className="h-5 w-5" />} label="Ranking de Ativos" collapsed={collapsed} />

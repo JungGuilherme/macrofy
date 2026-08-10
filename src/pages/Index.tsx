@@ -1,6 +1,7 @@
 import { useApp } from "@/contexts/AppContext";
 import { HomeSkeleton } from "@/components/common/LoadingSkeleton";
 import { EconomicAgenda } from "@/components/home/EconomicAgenda";
+import { EarningsCalendarSection } from "@/components/home/EarningsCalendarSection";
 
 import { LatestResearch } from "@/components/home/LatestResearch";
 import { HomeHeatmaps } from "@/components/home/HomeHeatmaps";
@@ -32,6 +33,7 @@ export default function Index() {
         <div className="lg:col-span-2 space-y-4">
 
           <EconomicAgenda />
+          <EarningsCalendarSection />
           <HomeHeatmaps />
           <RecommendationsList />
         </div>

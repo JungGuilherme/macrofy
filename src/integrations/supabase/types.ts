@@ -729,6 +729,51 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          company_name: string | null
+          country: string
+          dividend_type: string | null
+          event_date: string
+          event_type: string
+          id: string
+          payment_date: string | null
+          source: string
+          ticker: string
+          time_of_day: string | null
+          updated_at: string | null
+          value: number | null
+        }
+        Insert: {
+          company_name?: string | null
+          country: string
+          dividend_type?: string | null
+          event_date: string
+          event_type: string
+          id?: string
+          payment_date?: string | null
+          source: string
+          ticker: string
+          time_of_day?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Update: {
+          company_name?: string | null
+          country?: string
+          dividend_type?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          payment_date?: string | null
+          source?: string
+          ticker?: string
+          time_of_day?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Relationships: []
+      }
       macro_cycle_history: {
         Row: {
           computed_at: string | null

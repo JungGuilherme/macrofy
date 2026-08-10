@@ -32,6 +32,50 @@ const PRESETS: Record<string, Record<string, { name: string; currency: string }>
     "^FTSE": { name: "FTSE 100", currency: "GBP" },
     "^N225": { name: "Nikkei 225", currency: "JPY" },
   },
+  brasil: {
+    "^BVSP": { name: "Ibovespa", currency: "BRL" },
+    "IFIX.SA": { name: "IFIX", currency: "BRL" },
+    "SMAL11.SA": { name: "Small Caps", currency: "BRL" },
+    "BRL=X": { name: "Dólar", currency: "BRL" },
+  },
+  eua: {
+    "^GSPC": { name: "S&P 500", currency: "USD" },
+    "^IXIC": { name: "Nasdaq", currency: "USD" },
+    "^DJI": { name: "Dow Jones", currency: "USD" },
+    "^TNX": { name: "US 10Y", currency: "USD" },
+  },
+  asia: {
+    "^N225": { name: "Nikkei 225", currency: "JPY" },
+    "000001.SS": { name: "Shanghai", currency: "CNY" },
+    "^HSI": { name: "Hang Seng", currency: "HKD" },
+    "^TWII": { name: "Taiwan (TAIEX)", currency: "TWD" },
+  },
+  europa: {
+    "^STOXX50E": { name: "Euro Stoxx 50", currency: "EUR" },
+    "^GDAXI": { name: "DAX", currency: "EUR" },
+    "^FTSE": { name: "FTSE 100", currency: "GBP" },
+    "^FCHI": { name: "CAC 40", currency: "EUR" },
+  },
+  cripto: {
+    "BTC-USD": { name: "Bitcoin", currency: "USD" },
+    "ETH-USD": { name: "Ethereum", currency: "USD" },
+    "SOL-USD": { name: "Solana", currency: "USD" },
+    "DOGE-USD": { name: "Dogecoin", currency: "USD" },
+  },
+  commodities: {
+    "BZ=F": { name: "Brent", currency: "USD" },
+    "CL=F": { name: "WTI", currency: "USD" },
+    "GC=F": { name: "Ouro", currency: "USD" },
+    "SI=F": { name: "Prata", currency: "USD" },
+    "TIO=F": { name: "Minério de Ferro", currency: "USD" },
+  },
+  agro: {
+    "LE=F": { name: "Boi Gordo (CME)", currency: "USD" },
+    "ZS=F": { name: "Soja", currency: "USD" },
+    "ZC=F": { name: "Milho", currency: "USD" },
+    "KC=F": { name: "Café", currency: "USD" },
+    "SB=F": { name: "Açúcar", currency: "USD" },
+  },
 };
 
 let SYMBOLS: Record<string, { name: string; currency: string }> = DEFAULT_SYMBOLS;

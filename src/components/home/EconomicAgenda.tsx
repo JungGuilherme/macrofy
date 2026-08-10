@@ -31,7 +31,7 @@ export function EconomicAgenda() {
 
       <div className="w-full overflow-hidden rounded-lg border border-border">
         <iframe
-          src="https://sslecal2.investing.com/?ecoDayBackground=%235e5e5e&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex,_balance&importance=2,3&features=datepicker,timezone&countries=32,37,5,35,4,72&calType=day&timeZone=12&lang=12"
+          src="https://sslecal2.investing.com/?ecoDayBackground=%235e5e5e&columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&importance=2,3&features=datepicker,timezone&countries=32,37,5,72&calType=week&timeZone=12&lang=12"
           style={{
             width: 'calc(100% + 2px)',
             height: '467px',
