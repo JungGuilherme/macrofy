@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 import logoAvXp from "@/assets/logo-av-xp.svg";
+import InflacaoImplicitaChart from "@/components/curves/InflacaoImplicitaChart";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -194,6 +195,7 @@ export default function NtnbFechamentoPanel() {
         ) : null;
         return (
           <>
+            <InflacaoImplicitaChart rows={ntnb} loading={loading} onRefresh={load} footer={footer} />
             <FechamentoTable
               title="NTNB FECHAMENTO"
               rows={ntnb}
