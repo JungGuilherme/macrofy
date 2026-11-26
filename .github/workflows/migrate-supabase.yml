@@ -1,0 +1,264 @@
+name: Migrate Lovable Cloud -> own Supabase
+
+# One-off migration of the Macrofy backend from Lovable Cloud to the Supabase
+# project owned by the Macrofy organization. Runs only on manual dispatch or a
+# push to the `migrate/run` branch. Safe to re-run: it stops before touching a
+# database that already has the Macrofy tables, unless FORCE=1.
+#
+# Before running:
+#   1. Upload the Lovable export (macrofypro_*.backup) to the NEW project's
+#      Storage, private bucket `migration`, file name `macrofypro.backup`.
+#   2. Repository secrets: SUPABASE_ACCESS_TOKEN, NEW_SUPABASE_DB_PASSWORD
+#      (optional: FRED_API_KEY, BRAPI_TOKEN, OPENROUTER_API_KEY).
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-run even if the database already has tables (1 = yes)"
+        default: "0"
+  push:
+    branches: [migrate/run]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-supabase
+  cancel-in-progress: false
+
+env:
+  REF: frwnrmlioqnswmrbbdua
+  SITE_URL: https://macrofypro.com
+  FORCE: ${{ github.event.inputs.force || '0' }}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      DB_PASSWORD: ${{ secrets.NEW_SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          missing=0
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || { echo "::error::Falta o secret SUPABASE_ACCESS_TOKEN"; missing=1; }
+          [ -n "$DB_PASSWORD" ] || { echo "::error::Falta o secret NEW_SUPABASE_DB_PASSWORD"; missing=1; }
+          exit $missing
+
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Fetch project keys and connection
+        run: |
+          api() { curl -fsS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF$1"; }
+          keys=$(api "/api-keys?reveal=true")
+          ANON=$(echo "$keys" | jq -r '.[] | select(.name=="anon") | .api_key')
+          SERVICE=$(echo "$keys" | jq -r '.[] | select(.name=="service_role") | .api_key')
+          pooler=$(api "/config/database/pooler")
+          HOST=$(echo "$pooler" | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // .[0].db_host')
+          USER=$(echo "$pooler" | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_user // .[0].db_user')
+          [ -n "$ANON" ] && [ -n "$SERVICE" ] && [ -n "$HOST" ] || { echo "::error::Não consegui obter chaves/conexão do projeto"; exit 1; }
+          echo "::add-mask::$SERVICE"
+          echo "::add-mask::$DB_PASSWORD"
+          {
+            echo "ANON=$ANON"
+            echo "SERVICE=$SERVICE"
+            echo "SUPA_URL=https://$REF.supabase.co"
+            echo "PGHOST=$HOST"
+            echo "PGPORT=5432"
+            echo "PGUSER=$USER"
+            echo "PGDATABASE=postgres"
+            echo "PGPASSWORD=$DB_PASSWORD"
+            echo "PGSSLMODE=require"
+          } >> "$GITHUB_ENV"
+
+      - name: Download export from Storage
+        run: |
+          curl -fsS -H "Authorization: Bearer $SERVICE" -H "apikey: $SERVICE" \
+            "$SUPA_URL/storage/v1/object/migration/macrofypro.backup" -o "$RUNNER_TEMP/dump.backup"
+          ls -la "$RUNNER_TEMP/dump.backup"
+          pg_restore -l "$RUNNER_TEMP/dump.backup" > "$RUNNER_TEMP/full.list"
+          echo "TOC entries: $(grep -vc '^;' "$RUNNER_TEMP/full.list")"
+
+      - name: Guard against overwriting
+        run: |
+          n=$(psql -tAc "select count(*) from information_schema.tables where table_schema='public'")
+          echo "Tabelas em public hoje: $n"
+          if [ "$n" != "0" ] && [ "$FORCE" != "1" ]; then
+            echo "::error::O banco novo já tem tabelas em public. Para refazer do zero rode com force=1 (isso apaga o schema public)."
+            exit 1
+          fi
+          if [ "$n" != "0" ]; then
+            psql -v ON_ERROR_STOP=1 -c "drop schema public cascade; create schema public; grant usage on schema public to anon, authenticated, service_role; grant all on schema public to postgres, service_role;"
+            psql -c "delete from auth.identities; delete from auth.users;"
+          fi
+
+      - name: Extensions
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create extension if not exists pg_cron;
+          create extension if not exists pg_net with schema extensions;
+          create extension if not exists pgcrypto with schema extensions;
+          create extension if not exists "uuid-ossp" with schema extensions;
+          create extension if not exists pgmq;
+          SQL
+
+      - name: Restore schema public + data + users (atomic)
+        run: |
+          python3 scripts/migration/filter_toc.py main < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/main.list"
+          pg_restore --no-owner --no-acl --single-transaction --exit-on-error \
+            -L "$RUNNER_TEMP/main.list" -d "postgres" "$RUNNER_TEMP/dump.backup"
+
+      - name: Restore grants (without Lovable-only roles)
+        run: |
+          python3 scripts/migration/filter_toc.py acl < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/acl.list"
+          pg_restore -L "$RUNNER_TEMP/acl.list" -f "$RUNNER_TEMP/acl.sql" "$RUNNER_TEMP/dump.backup"
+          grep -v 'sandbox_exec' "$RUNNER_TEMP/acl.sql" > "$RUNNER_TEMP/acl-clean.sql"
+          psql -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/acl-clean.sql" > /dev/null
+          # Sequences/tables created later by migrations keep working for the API roles.
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          grant usage on schema public to anon, authenticated, service_role;
+          grant all on all sequences in schema public to anon, authenticated, service_role;
+          alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role;
+          alter default privileges for role postgres in schema public grant all on functions to anon, authenticated, service_role;
+          alter default privileges for role postgres in schema public grant all on sequences to anon, authenticated, service_role;
+          SQL
+
+      - name: Restore signup trigger and storage policies
+        run: |
+          python3 scripts/migration/filter_toc.py extras < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/extras.list"
+          pg_restore --no-owner --no-acl -L "$RUNNER_TEMP/extras.list" -d "postgres" "$RUNNER_TEMP/dump.backup" 2>&1 | tee "$RUNNER_TEMP/extras.log"
+          if grep -q "error" "$RUNNER_TEMP/extras.log"; then
+            echo "::warning::Algum item extra (trigger de cadastro ou políticas do Storage) falhou — ver log acima."
+          fi
+
+      - name: Storage buckets
+        run: |
+          mk() {
+            code=$(curl -s -o /tmp/b.json -w "%{http_code}" -X POST "$SUPA_URL/storage/v1/bucket" \
+              -H "Authorization: Bearer $SERVICE" -H "apikey: $SERVICE" -H "Content-Type: application/json" \
+              -d "{\"id\":\"$1\",\"name\":\"$1\",\"public\":$2}")
+            echo "bucket $1 -> HTTP $code $(cat /tmp/b.json)"
+          }
+          mk documents true
+          mk course-files false
+
+      - name: Function secrets
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          BRAPI_TOKEN: ${{ secrets.BRAPI_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          SYNC_SECRET=$(openssl rand -hex 32)
+          echo "::add-mask::$SYNC_SECRET"
+          echo "SYNC_SECRET=$SYNC_SECRET" >> "$GITHUB_ENV"
+          body=$(jq -n --arg s "$SYNC_SECRET" --arg f "$FRED_API_KEY" --arg b "$BRAPI_TOKEN" --arg o "$OPENROUTER_API_KEY" '
+            [{name:"SYNC_SECRET",value:$s}]
+            + (if $f != "" then [{name:"FRED_API_KEY",value:$f}] else [] end)
+            + (if $b != "" then [{name:"BRAPI_TOKEN",value:$b}] else [] end)
+            + (if $o != "" then [{name:"OPENROUTER_API_KEY",value:$o}] else [] end)')
+          curl -fsS -X POST "https://api.supabase.com/v1/projects/$REF/secrets" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" -d "$body"
+          echo "Secrets gravados: $(echo "$body" | jq -r 'map(.name) | join(", ")')"
+          [ -n "$FRED_API_KEY" ] || echo "::warning::FRED_API_KEY não informado — sync-macro-fred e sync-macro-global vão falhar até ser cadastrado."
+          [ -n "$BRAPI_TOKEN" ] || echo "::warning::BRAPI_TOKEN não informado — sync-brapi-pe/earnings/dividends vão falhar até ser cadastrado."
+          [ -n "$OPENROUTER_API_KEY" ] || echo "::warning::OPENROUTER_API_KEY não informado — translate-news vai falhar até ser cadastrado."
+
+      - name: Deploy edge functions
+        run: supabase functions deploy --project-ref "$REF" --use-api
+
+      - name: Cron jobs (pg_cron -> edge functions)
+        run: |
+          psql -v ON_ERROR_STOP=1 -v url="$SUPA_URL" -v anon="$ANON" -v secret="$SYNC_SECRET" <<'SQL'
+          -- Keys live in Vault, not inside the job text.
+          select vault.create_secret(:'url', 'project_url') where not exists (select 1 from vault.secrets where name = 'project_url');
+          select vault.create_secret(:'anon', 'anon_key') where not exists (select 1 from vault.secrets where name = 'anon_key');
+          select vault.create_secret(:'secret', 'sync_secret') where not exists (select 1 from vault.secrets where name = 'sync_secret');
+          select vault.update_secret(id, :'url') from vault.secrets where name = 'project_url';
+          select vault.update_secret(id, :'anon') from vault.secrets where name = 'anon_key';
+          select vault.update_secret(id, :'secret') from vault.secrets where name = 'sync_secret';
+
+          create or replace function public.invoke_edge_function(fn text, payload jsonb default '{}'::jsonb)
+          returns bigint language sql security definer set search_path = '' as $$
+            select net.http_post(
+              url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/' || fn,
+              headers := jsonb_build_object(
+                'Content-Type', 'application/json',
+                'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key'),
+                'x-sync-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'sync_secret')),
+              body := payload);
+          $$;
+          revoke all on function public.invoke_edge_function(text, jsonb) from public, anon, authenticated;
+
+          select cron.unschedule(jobname) from cron.job where jobname like 'macrofy-%';
+          select cron.schedule('macrofy-refresh-rss',          '0 * * * *',    $$select public.invoke_edge_function('refresh-rss')$$);
+          select cron.schedule('macrofy-fedwatch-13h',         '0 13 * * *',   $$select public.invoke_edge_function('fedwatch-proxy', '{"triggered":"cron"}')$$);
+          select cron.schedule('macrofy-copom-13h',            '0 13 * * *',   $$select public.invoke_edge_function('copom-proxy', '{"triggered":"cron"}')$$);
+          select cron.schedule('macrofy-fedwatch-18h',         '0 18 * * *',   $$select public.invoke_edge_function('fedwatch-proxy', '{"triggered":"cron"}')$$);
+          select cron.schedule('macrofy-copom-18h',            '0 18 * * *',   $$select public.invoke_edge_function('copom-proxy', '{"triggered":"cron"}')$$);
+          select cron.schedule('macrofy-sync-b3-flows',        '0 22 * * 1-5', $$select public.invoke_edge_function('sync-b3-flows')$$);
+          select cron.schedule('macrofy-sync-sentiment-index', '0 22 * * *',   $$select public.invoke_edge_function('sync-sentiment-index', '{"time":"scheduled"}')$$);
+          select cron.schedule('macrofy-anbima-ntnb',          '0 22 * * 1-5', $$select public.invoke_edge_function('anbima-ntnb')$$);
+          select jobname, schedule from cron.job order by jobname;
+          SQL
+
+      - name: Auth settings
+        run: |
+          curl -fsS -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"site_url\":\"$SITE_URL\",\"uri_allow_list\":\"$SITE_URL/**,http://localhost:8080/**\"}" > /dev/null
+          echo "site_url = $SITE_URL"
+
+      - name: Verify
+        run: |
+          psql -v ON_ERROR_STOP=1 -P pager=off <<'SQL'
+          select 'auth.users' as tabela, count(*)::int as linhas from auth.users
+          union all
+          select 'public.' || table_name,
+                 (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text::int
+          from information_schema.tables
+          where table_schema = 'public' and table_type = 'BASE TABLE'
+          order by 2 desc, 1;
+          SQL
+          curl -s -o /dev/null -w "tesouro-curva sem login -> HTTP %{http_code} (401 esperado)\n" "$SUPA_URL/functions/v1/tesouro-curva?tipo=PREFIXADA"
+
+      - name: Delete export from Storage
+        if: success()
+        run: |
+          curl -s -X DELETE "$SUPA_URL/storage/v1/object/migration" -H "Authorization: Bearer $SERVICE" -H "apikey: $SERVICE" \
+            -H "Content-Type: application/json" -d '{"prefixes":["macrofypro.backup"]}' > /dev/null
+          curl -s -X POST "$SUPA_URL/storage/v1/bucket/migration/empty" -H "Authorization: Bearer $SERVICE" -H "apikey: $SERVICE" > /dev/null
+          curl -s -X DELETE "$SUPA_URL/storage/v1/bucket/migration" -H "Authorization: Bearer $SERVICE" -H "apikey: $SERVICE"
+          echo
+          echo "Export removido do Storage."
+
+      - name: Summary
+        if: success()
+        run: |
+          {
+            echo "## Migração concluída"
+            echo ""
+            echo "Para apontar o site para o Supabase novo, atualize os secrets do repositório:"
+            echo ""
+            echo "| Secret | Valor |"
+            echo "|---|---|"
+            echo "| VITE_SUPABASE_URL | \`$SUPA_URL\` |"
+            echo "| VITE_SUPABASE_PROJECT_ID | \`$REF\` |"
+            echo "| VITE_SUPABASE_PUBLISHABLE_KEY | \`$ANON\` |"
+            echo ""
+            echo "(A chave publishable/anon é pública por natureza — é a mesma que vai no JavaScript do site.)"
+          } >> "$GITHUB_STEP_SUMMARY"
