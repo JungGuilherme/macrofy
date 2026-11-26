@@ -1,4 +1,4 @@
-project_id = "dmbmlqfucquspiruvuam"
+project_id = "frwnrmlioqnswmrbbdua"
 
 [functions.translate-news]
 verify_jwt = false
@@ -16,12 +16,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.sync-macro-fred]
-verify_jwt = false
-
-[functions.fetch-copom]
-verify_jwt = false
-
-[functions.fetch-fedwatch]
 verify_jwt = false
 
 [functions.fedwatch-proxy]
