@@ -99,8 +99,11 @@ jobs:
           n=$(psql -tAc "select count(*) from information_schema.tables where table_schema='public'")
           echo "Tabelas em public hoje: $n"
           if [ "$n" != "0" ] && [ "$FORCE" != "1" ]; then
-            echo "::error::O banco novo já tem tabelas em public. Para refazer do zero rode com force=1 (isso apaga o schema public)."
-            exit 1
+            # Already restored by a previous run: keep the data, redo only the
+            # idempotent steps (buckets, secrets, functions, cron, auth, checks).
+            echo "::notice::Banco já restaurado ($n tabelas). Pulando a restauração; para refazer do zero rode com force=1."
+            echo "RESTORED=1" >> "$GITHUB_ENV"
+            exit 0
           fi
           if [ "$n" != "0" ]; then
             psql -v ON_ERROR_STOP=1 -c "drop schema public cascade; create schema public; grant usage on schema public to anon, authenticated, service_role; grant all on schema public to postgres, service_role;"
@@ -108,6 +111,7 @@ jobs:
           fi
 
       - name: Extensions
+        if: env.RESTORED != '1'
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
           create extension if not exists pg_cron;
@@ -118,12 +122,14 @@ jobs:
           SQL
 
       - name: Restore schema public + data + users (atomic)
+        if: env.RESTORED != '1'
         run: |
           python3 scripts/migration/filter_toc.py main < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/main.list"
           pg_restore --no-owner --no-acl --single-transaction --exit-on-error \
             -L "$RUNNER_TEMP/main.list" -d "postgres" "$RUNNER_TEMP/dump.backup"
 
       - name: Restore grants (without Lovable-only roles)
+        if: env.RESTORED != '1'
         run: |
           python3 scripts/migration/filter_toc.py acl < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/acl.list"
           pg_restore -L "$RUNNER_TEMP/acl.list" -f "$RUNNER_TEMP/acl.sql" "$RUNNER_TEMP/dump.backup"
@@ -139,6 +145,7 @@ jobs:
           SQL
 
       - name: Restore signup trigger and storage policies
+        if: env.RESTORED != '1'
         run: |
           python3 scripts/migration/filter_toc.py extras < "$RUNNER_TEMP/full.list" > "$RUNNER_TEMP/extras.list"
           pg_restore --no-owner --no-acl -L "$RUNNER_TEMP/extras.list" -d "postgres" "$RUNNER_TEMP/dump.backup" 2>&1 | tee "$RUNNER_TEMP/extras.log"
@@ -179,7 +186,7 @@ jobs:
           [ -n "$OPENROUTER_API_KEY" ] || echo "::warning::OPENROUTER_API_KEY não informado — translate-news vai falhar até ser cadastrado."
 
       - name: Deploy edge functions
-        run: supabase functions deploy --project-ref "$REF" --use-api
+        run: supabase functions deploy --project-ref "$REF" --use-api --yes
 
       - name: Cron jobs (pg_cron -> edge functions)
         run: |
