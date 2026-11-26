@@ -66,16 +66,19 @@ def keep_acl(desc, schema, name):
 def main():
     mode = sys.argv[1]
     keep = {"main": keep_main, "extras": keep_extras, "acl": keep_acl}[mode]
-    kept = 0
+    first, rest = [], []
     for line in sys.stdin:
         line = line.rstrip("\n")
         if not line or line.startswith(";"):
             continue
         p = parse(line)
         if p and keep(*p):
-            print(line)
-            kept += 1
-    print(f"{mode}: kept {kept} entries", file=sys.stderr)
+            # pg_restore -L follows list order: auth.users must load before
+            # auth.identities (FK identities_user_id_fkey on the target).
+            (first if p[:3] == ("TABLE DATA", "auth", "users") else rest).append(line)
+    for line in first + rest:
+        print(line)
+    print(f"{mode}: kept {len(first) + len(rest)} entries", file=sys.stderr)
 
 
 if __name__ == "__main__":
