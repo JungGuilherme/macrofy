@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Macrofy</title>
+    <script>
+      // O app usa HashRouter (/#/rota). Links sem o "#", como
+      // macrofypro.com/tesouro-curvas, caem neste 404 do GitHub Pages:
+      // redireciona para a rota equivalente com hash.
+      (function () {
+        var l = window.location;
+        var path = l.pathname.replace(/\/+$/, "") || "/";
+        l.replace(l.origin + "/#" + path + l.search + l.hash.replace(/^#/, ""));
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

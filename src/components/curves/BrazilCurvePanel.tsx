@@ -125,32 +125,43 @@ export default function BrazilCurvePanel() {
   const fetchCurves = useCallback(async () => {
     setLoading(true);
     try {
-      const results = await Promise.all(
-        curveConfigs.map(async (config): Promise<CurveData | null> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {};
+
+      // Sequential (not Promise.all): the first call warms the function's
+      // cache and the rest are instant; firing all at once spun up several
+      // cold workers in parallel and tripped 546 WORKER_RESOURCE_LIMIT.
+      const fetchOne = async (config: CurveConfig): Promise<CurveData | null> => {
+        const dateStr = format(config.date, "yyyy-MM-dd");
+        const url = `${SUPABASE_URL}/functions/v1/tesouro-curva?tipo=${curveType}&data=${dateStr}`;
+        let lastError = "Erro desconhecido";
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800 * attempt));
           try {
-            const dateStr = format(config.date, "yyyy-MM-dd");
-            const url = `${SUPABASE_URL}/functions/v1/tesouro-curva?tipo=${curveType}&data=${dateStr}`;
-            const { data: { session } } = await supabase.auth.getSession();
-            const response = await fetch(url, {
-              headers: session?.access_token
-                ? { Authorization: `Bearer ${session.access_token}` }
-                : {},
-            });
-            if (!response.ok) {
-              const error = await response.json();
-              toast({
-                title: "Erro ao carregar curva",
-                description: error.error || "Erro desconhecido",
-                variant: "destructive",
-              });
-              return null;
-            }
-            return await response.json();
-          } catch {
-            return null;
+            const response = await fetch(url, { headers });
+            if (response.ok) return await response.json();
+            const body = await response.json().catch(() => ({}));
+            lastError = body.error || body.message || `HTTP ${response.status}`;
+            // Client errors (bad params, auth) won't improve on retry.
+            if (response.status < 500) break;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : "Falha de rede";
           }
-        })
-      );
+        }
+        toast({
+          title: `Erro ao carregar curva de ${format(config.date, "dd/MM/yyyy")}`,
+          description: lastError,
+          variant: "destructive",
+        });
+        return null;
+      };
+
+      const results: (CurveData | null)[] = [];
+      for (const config of curveConfigs) {
+        results.push(await fetchOne(config));
+      }
       setCurveData(results);
     } catch {
       toast({
