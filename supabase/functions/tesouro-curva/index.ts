@@ -8,7 +8,6 @@ const corsHeaders = {
 const TESOURO_CSV_URL = "https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv";
 
 // Simple in-memory cache (15 min)
-let csvCache: { data: string; timestamp: number } | null = null;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
 // Map tipo to title patterns
@@ -84,21 +83,118 @@ function formatVencimentoLabel(date: Date): string {
   return `${month}/${year}`;
 }
 
-async function fetchCSV(): Promise<string> {
-  const now = Date.now();
-  if (csvCache && now - csvCache.timestamp < CACHE_TTL_MS) {
-    console.log("Using cached CSV data");
-    return csvCache.data;
-  }
+// ── Compact, shared index ────────────────────────────────────────────────
+// The Tesouro CSV covers every title since 2002 and keeps growing. Parsing it
+// in full on every request (and once per parallel request) started blowing the
+// edge function CPU/memory budget (HTTP 546 WORKER_RESOURCE_LIMIT), so the
+// latest curves stopped loading. We now parse it ONCE per isolate into a small
+// index { tipo -> dataBase(YYYY-MM-DD) -> rows }, and concurrent requests share
+// the same in-flight build.
 
+interface IndexRow {
+  venc: string; // YYYY-MM-DD
+  taxa: number;
+}
+type TipoIndex = Map<string, IndexRow[]>; // dataBase -> rows
+type CurveIndex = Record<string, TipoIndex>;
+
+let indexCache: { index: CurveIndex; timestamp: number } | null = null;
+let indexBuild: Promise<CurveIndex> | null = null;
+
+/** DD/MM/YYYY -> YYYY-MM-DD without allocating Date objects. */
+function brToIso(s: string): string | null {
+  if (s.length < 10 || s[2] !== "/" || s[5] !== "/") return null;
+  return `${s.slice(6, 10)}-${s.slice(3, 5)}-${s.slice(0, 2)}`;
+}
+
+function tipoOf(tipoTitulo: string): string | null {
+  for (const [tipo, patterns] of Object.entries(TIPO_PATTERNS)) {
+    if (patterns.some((p) => tipoTitulo.includes(p))) return tipo;
+  }
+  return null;
+}
+
+async function buildIndex(): Promise<CurveIndex> {
   console.log("Fetching fresh CSV from Tesouro Transparente...");
   const response = await fetch(TESOURO_CSV_URL);
   if (!response.ok) {
     throw new Error(`Failed to fetch CSV: ${response.status}`);
   }
-  const data = await response.text();
-  csvCache = { data, timestamp: now };
-  return data;
+  const csv = await response.text();
+
+  let pos = csv.indexOf("\n");
+  if (pos < 0) throw new Error("CSV vazio ou inválido");
+  const header = parseCSVLine(csv.slice(0, pos).replace(/\r$/, ""));
+  const tipoIdx = header.indexOf("Tipo Titulo");
+  const baseIdx = header.indexOf("Data Base");
+  const vencIdx = header.indexOf("Data Vencimento");
+  const taxaIdx = header.indexOf(TAXA_COLUNA);
+  if (tipoIdx < 0 || baseIdx < 0 || vencIdx < 0) {
+    throw new Error("Colunas obrigatórias não encontradas no CSV");
+  }
+  if (taxaIdx < 0) throw new Error(`Coluna de taxa não encontrada: ${TAXA_COLUNA}`);
+  const minCols = Math.max(tipoIdx, baseIdx, vencIdx, taxaIdx) + 1;
+
+  const index: CurveIndex = {};
+  for (const tipo of Object.keys(TIPO_PATTERNS)) index[tipo] = new Map();
+  const tipoCache = new Map<string, string | null>();
+
+  // Walk the string line by line (no giant split array). This CSV has no
+  // quoted fields, so a plain split(";") per line is safe and much cheaper.
+  while (pos >= 0 && pos < csv.length) {
+    const next = csv.indexOf("\n", pos + 1);
+    const line = csv.slice(pos + 1, next < 0 ? csv.length : next);
+    pos = next;
+    if (line.length < 10) continue;
+    const cols = (line.includes('"') ? line.replace(/"/g, "") : line).split(";");
+    if (cols.length < minCols) continue;
+
+    const tipoTitulo = cols[tipoIdx].trim();
+    let tipo = tipoCache.get(tipoTitulo);
+    if (tipo === undefined) {
+      tipo = tipoOf(tipoTitulo);
+      tipoCache.set(tipoTitulo, tipo);
+    }
+    if (!tipo) continue;
+
+    const base = brToIso(cols[baseIdx].trim());
+    const venc = brToIso(cols[vencIdx].trim());
+    const taxa = parseNumber(cols[taxaIdx]);
+    if (!base || !venc || taxa === null) continue;
+
+    const byDate = index[tipo];
+    const rows = byDate.get(base);
+    if (rows) rows.push({ venc, taxa });
+    else byDate.set(base, [{ venc, taxa }]);
+  }
+  return index;
+}
+
+async function getIndex(): Promise<CurveIndex> {
+  if (indexCache && Date.now() - indexCache.timestamp < CACHE_TTL_MS) {
+    return indexCache.index;
+  }
+  if (!indexBuild) {
+    indexBuild = buildIndex()
+      .then((index) => {
+        indexCache = { index, timestamp: Date.now() };
+        return index;
+      })
+      .finally(() => {
+        indexBuild = null;
+      });
+  }
+  try {
+    return await indexBuild;
+  } catch (err) {
+    // Tesouro site down: serve the stale index rather than failing.
+    if (indexCache) return indexCache.index;
+    throw err;
+  }
+}
+
+function isoToDate(iso: string): Date {
+  return new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
 }
 
 interface CurvePoint {
@@ -165,132 +261,30 @@ serve(async (req) => {
       );
     }
 
-    const patterns = TIPO_PATTERNS[tipo];
+    const byDate = (await getIndex())[tipo];
+    const sortedDates = Array.from(byDate.keys()).sort().reverse(); // ISO strings sort chronologically
 
-    // Fetch and parse CSV
-    const csvData = await fetchCSV();
-    const lines = csvData.split("\n").filter((line) => line.trim());
-    if (lines.length < 2) {
-      return new Response(
-        JSON.stringify({ error: "CSV vazio ou inválido" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Exact date or closest previous; if before all available, use the earliest.
+    const wanted = dataParam.slice(0, 10);
+    const usedIso = sortedDates.find((d) => d <= wanted) ?? sortedDates[sortedDates.length - 1];
 
-    // Parse header to find column indices
-    const header = parseCSVLine(lines[0]);
-    const colIndices: Record<string, number> = {};
-    header.forEach((col, idx) => {
-      colIndices[col] = idx;
-    });
-
-    const tipoTituloIdx = colIndices["Tipo Titulo"];
-    const dataBaseIdx = colIndices["Data Base"];
-    const dataVencimentoIdx = colIndices["Data Vencimento"];
-    const taxaColunaIdx = colIndices[TAXA_COLUNA];
-
-    if (tipoTituloIdx === undefined || dataBaseIdx === undefined || dataVencimentoIdx === undefined) {
-      return new Response(
-        JSON.stringify({ error: "Colunas obrigatórias não encontradas no CSV" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (taxaColunaIdx === undefined) {
-      return new Response(
-        JSON.stringify({ error: `Coluna de taxa não encontrada: ${TAXA_COLUNA}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Parse all data rows
-    interface DataRow {
-      tipoTitulo: string;
-      dataBase: Date;
-      dataVencimento: Date;
-      taxa: number;
-    }
-
-    const allData: DataRow[] = [];
-    const availableDates = new Set<string>();
-
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCSVLine(lines[i]);
-      if (cols.length < Math.max(tipoTituloIdx, dataBaseIdx, dataVencimentoIdx, taxaColunaIdx) + 1) {
-        continue;
-      }
-
-      const tipoTitulo = cols[tipoTituloIdx];
-      const dataBase = parseDate(cols[dataBaseIdx]);
-      const dataVencimento = parseDate(cols[dataVencimentoIdx]);
-      const taxaValue = parseNumber(cols[taxaColunaIdx]);
-
-      if (!dataBase || !dataVencimento || taxaValue === null) continue;
-
-      // Check if title matches the requested type
-      const matches = patterns.some((pattern) => tipoTitulo.includes(pattern));
-      if (!matches) continue;
-
-      availableDates.add(formatDate(dataBase));
-      allData.push({
-        tipoTitulo,
-        dataBase,
-        dataVencimento,
-        taxa: taxaValue,
-      });
-    }
-
-    // Find the best date (exact match or closest previous)
-    const requestedDate = new Date(dataParam);
-    let usedDate: Date | null = null;
-
-    // Sort available dates descending
-    const sortedDates = Array.from(availableDates)
-      .map((d) => new Date(d))
-      .sort((a, b) => b.getTime() - a.getTime());
-
-    for (const d of sortedDates) {
-      if (d <= requestedDate) {
-        usedDate = d;
-        break;
-      }
-    }
-
-    if (!usedDate && sortedDates.length > 0) {
-      // If requested date is before all available, use the earliest
-      usedDate = sortedDates[sortedDates.length - 1];
-    }
-
-    if (!usedDate) {
+    if (!usedIso) {
       return new Response(
         JSON.stringify({ error: "Nenhuma data disponível para o tipo selecionado" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const usedDate = isoToDate(usedIso);
 
     const usedDateStr = formatDate(usedDate);
 
-    // Filter data for the used date
-    const filteredData = allData.filter((row) => formatDate(row.dataBase) === usedDateStr);
-
-    // Group by vencimento date (use full date for accurate grouping)
+    // Group by vencimento date
     const pointsMap = new Map<string, { taxas: number[]; vencimento: Date }>();
-
-    for (const row of filteredData) {
-      const diffMs = row.dataVencimento.getTime() - row.dataBase.getTime();
-      const anos = diffMs / (365 * 24 * 60 * 60 * 1000);
-
-      if (anos <= 0) continue;
-
-      // Use vencimento date as key for grouping
-      const vencKey = formatDate(row.dataVencimento);
-
-      const existing = pointsMap.get(vencKey);
-      if (existing) {
-        existing.taxas.push(row.taxa);
-      } else {
-        pointsMap.set(vencKey, { taxas: [row.taxa], vencimento: row.dataVencimento });
-      }
+    for (const row of byDate.get(usedIso) ?? []) {
+      if (row.venc <= usedIso) continue; // already matured
+      const existing = pointsMap.get(row.venc);
+      if (existing) existing.taxas.push(row.taxa);
+      else pointsMap.set(row.venc, { taxas: [row.taxa], vencimento: isoToDate(row.venc) });
     }
 
     // Calculate averages and build response
